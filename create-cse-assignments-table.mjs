@@ -2,13 +2,22 @@ import pg from 'pg'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import dotenv from 'dotenv'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// Use the direct connection URL
-const DATABASE_URL = process.env.DATABASE_URL_DIRECT ||
-  'postgresql://postgres:***REMOVED***@db.usoyxsunetvxdjdglkmn.supabase.co:5432/postgres'
+// Load environment variables
+dotenv.config({ path: path.join(__dirname, '../.env.local') })
+
+// SECURITY: Never hardcode database credentials - always use environment variables
+const DATABASE_URL = process.env.DATABASE_URL_DIRECT
+
+if (!DATABASE_URL) {
+  console.error('❌ Missing DATABASE_URL_DIRECT environment variable')
+  console.error('   Please set this in .env.local with your Supabase direct connection URL')
+  process.exit(1)
+}
 
 async function createTable() {
   const client = new pg.Client({ connectionString: DATABASE_URL })

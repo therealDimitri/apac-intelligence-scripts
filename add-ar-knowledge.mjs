@@ -1,7 +1,26 @@
 import { createClient } from '@supabase/supabase-js'
+import dotenv from 'dotenv'
+import { fileURLToPath } from 'url'
+import { dirname, join } from 'path'
 
-const supabaseUrl = 'https://usoyxsunetvxdjdglkmn.supabase.co'
-const supabaseKey = '***REMOVED***'
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+
+// Load environment variables
+dotenv.config({ path: join(__dirname, '../.env.local') })
+
+// SECURITY: Use environment variables for secrets - never hardcode credentials
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+// Validate required environment variables
+if (!supabaseUrl || !supabaseKey) {
+  console.error('❌ Missing required environment variables:')
+  if (!supabaseUrl) console.error('   - NEXT_PUBLIC_SUPABASE_URL')
+  if (!supabaseKey) console.error('   - SUPABASE_SERVICE_ROLE_KEY')
+  console.error('   Please set these in .env.local')
+  process.exit(1)
+}
 
 const supabase = createClient(supabaseUrl, supabaseKey)
 
