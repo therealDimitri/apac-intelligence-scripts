@@ -18,7 +18,14 @@ const __dirname = dirname(__filename)
 // Load environment variables
 dotenv.config({ path: join(__dirname, '../.env.local') })
 
-// Connection strings to try
+// Validate required environment variables
+if (!process.env.DATABASE_URL && !process.env.DATABASE_URL_DIRECT) {
+  console.error('❌ Missing required environment variable: DATABASE_URL or DATABASE_URL_DIRECT')
+  console.error('   Please set these in .env.local')
+  process.exit(1)
+}
+
+// Connection strings to try (all from environment variables - no hardcoded secrets)
 const connectionStrings = [
   // Try DATABASE_URL first
   {
@@ -34,11 +41,6 @@ const connectionStrings = [
   {
     name: 'Session Mode Pooler',
     url: process.env.DATABASE_URL?.replace(':6543/', ':5432/')
-  },
-  // Try with the database password from DIRECT URL
-  {
-    name: 'Pooler with DB Password',
-    url: `postgresql://postgres.usoyxsunetvxdjdglkmn:***REMOVED***@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres`
   }
 ]
 

@@ -10,11 +10,29 @@
 import XLSX from 'xlsx';
 import https from 'https';
 import fs from 'fs';
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
-// Configuration
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Load environment variables
+dotenv.config({ path: join(__dirname, '../.env.local') });
+
+// Configuration - SECURITY: Use environment variables for secrets
 const EXCEL_PATH = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Clients - Client Success/Client Segmentation/APAC Client Segmentation Activity Register 2025.xlsx';
-const SUPABASE_URL = 'usoyxsunetvxdjdglkmn.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzb3l4c3VuZXR2eGRqZGdsa21uIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MDc2OTY0OSwiZXhwIjoyMDc2MzQ1NjQ5fQ.zQN6yqzOXv68xNxhQa7suGssDmRBd5RXjB9s1i3z-KQ';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace('https://', '') || '';
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+// Validate required environment variables
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+  console.error('❌ Missing required environment variables:');
+  if (!SUPABASE_URL) console.error('   - NEXT_PUBLIC_SUPABASE_URL');
+  if (!SUPABASE_KEY) console.error('   - SUPABASE_SERVICE_ROLE_KEY');
+  console.error('   Please set these in .env.local');
+  process.exit(1);
+}
 
 // Event name to UUID mapping
 const EVENT_TYPE_MAP = {
