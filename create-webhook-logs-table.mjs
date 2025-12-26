@@ -21,11 +21,12 @@ const __dirname = dirname(__filename)
 dotenv.config({ path: join(__dirname, '../.env.local') })
 
 // Use direct connection URL for DDL operations (pooler doesn't support all session-level features)
-const connectionString = process.env.DATABASE_URL_DIRECT ||
-  'postgresql://postgres:NkrK6QiN4wwOB5xs@db.usoyxsunetvxdjdglkmn.supabase.co:5432/postgres'
+// SECURITY: Never hardcode database credentials - always use environment variables
+const connectionString = process.env.DATABASE_URL_DIRECT
 
 if (!connectionString) {
   console.error('❌ Missing DATABASE_URL_DIRECT environment variable')
+  console.error('   Please set this in .env.local with your Supabase direct connection URL')
   process.exit(1)
 }
 
