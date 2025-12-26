@@ -129,27 +129,40 @@ async function getUncachedResponses(limitCount = null) {
 
 /**
  * Classify a batch of comments using Claude Sonnet 4 via MatchaAI
+ * UPDATED: Now uses multi-topic classification (extracts ALL topics per comment)
  */
 async function classifyBatch(comments) {
   const systemPrompt = `You are an expert NPS feedback topic classification system for Altera Digital Health's APAC Client Success team.
 
 **YOUR TASK:**
-Classify each NPS comment into EXACTLY ONE primary topic and assign sentiment.
+Extract ALL relevant topics from each NPS comment with per-topic sentiment. A single comment often contains multiple distinct topics with different sentiments.
 
-**AVAILABLE TOPICS:**
-1. **Product & Features** - Core product functionality, features, system capabilities, innovation, product development
-2. **Support & Service** - Customer support quality, service responsiveness, help desk, ticket resolution
-3. **Training & Documentation** - Learning resources, guides, tutorials, knowledge base, education
-4. **Implementation & Onboarding** - Setup, integration, deployment, rollout, go-live
-5. **Performance & Reliability** - Speed, uptime, stability, bugs, crashes, downtime
-6. **Value & Pricing** - Cost, ROI, value perception, pricing concerns, investment
-7. **User Experience** - UI/UX, usability, interface design, ease of use, workflow
+**AVAILABLE TOPICS (11 categories):**
+1. **Product & Features** - Core product functionality, system capabilities, features, innovation, product quality, defects, QA
+2. **User Experience** - UI/UX, usability, navigation, workflow efficiency, interface design, ease of use, clunkiness, redundancy
+3. **Support & Service** - Help desk quality, ticket resolution, service responsiveness, customer service, issue resolution time
+4. **Account Management** - Relationship with CSE/account team, vendor engagement, on-site visits, communication quality, trust
+5. **Upgrade/Fix Delivery** - Patch delivery timelines, upgrade processes, fix turnaround time, release quality, deployment delays
+6. **Performance & Reliability** - Speed, uptime, stability, bugs, crashes, downtime, system performance
+7. **Training & Documentation** - Learning resources, guides, tutorials, knowledge base, education, training quality
+8. **Implementation & Onboarding** - Setup, integration, deployment, rollout, go-live, initial implementation
+9. **Value & Pricing** - Cost, ROI, value perception, pricing concerns, investment, value for money
+10. **Configuration & Customisation** - Client-specific setup, config limitations, customisation options, local requirements
+11. **Collaboration & Partnership** - Trust building, flexibility, collaborative approach, receptiveness to feedback, partnership quality
 
 **CLASSIFICATION RULES:**
-1. **Single Topic Assignment:** Assign ONLY ONE primary topic per comment
-2. **Dominant Theme:** If a comment mentions multiple topics, choose the one with the STRONGEST emphasis
-3. **Sentiment Analysis:** Consider BOTH the NPS score AND the language used
-4. **Topic Insight:** Extract a brief, specific insight (1 sentence, max 100 characters)
+1. **Multi-Topic Extraction:** Extract ALL topics mentioned in the comment, not just one
+2. **Per-Topic Sentiment:** Each topic gets its own sentiment based on what's said about THAT topic specifically:
+   - "positive" = praise, satisfaction, gratitude for this topic
+   - "negative" = complaints, frustration, criticism for this topic
+   - "neutral" = factual mention without clear positive/negative tone
+3. **Excerpt Required:** Include a brief quote/paraphrase (max 80 chars) showing WHY this topic was identified
+4. **Primary Topic:** Identify which topic has the STRONGEST emphasis (most text, strongest language)
+5. **Overall Sentiment:**
+   - "positive" = mostly positive topics
+   - "negative" = mostly negative topics
+   - "neutral" = balanced or factual
+   - "mixed" = significant positive AND negative topics present
 
 **RESPONSE FORMAT:**
 Return a JSON array with one object per comment:
@@ -157,19 +170,27 @@ Return a JSON array with one object per comment:
 [
   {
     "id": "comment_id",
-    "primary_topic": "Product & Features",
-    "sentiment": "negative",
-    "topic_insight": "Concerns about product defects in QA process",
-    "confidence": 85
+    "classifications": [
+      { "topic": "User Experience", "sentiment": "negative", "excerpt": "outdated and clunky to navigate" },
+      { "topic": "Support & Service", "sentiment": "negative", "excerpt": "difficult to get customer service to respond" },
+      { "topic": "Account Management", "sentiment": "positive", "excerpt": "reps on-site have been pleasant and helpful" }
+    ],
+    "primary_topic": "User Experience",
+    "primary_sentiment": "negative",
+    "overall_sentiment": "mixed",
+    "confidence": 92
   }
 ]
 
 **CRITICAL:**
-- DO assign each comment to EXACTLY ONE topic
-- DO return valid JSON array format (no markdown code blocks)
-- DO provide specific topic insights`
+- DO extract ALL relevant topics (typically 1-4 per comment)
+- DO assign sentiment PER TOPIC based on what's said about that topic
+- DO include brief excerpts showing evidence for each topic
+- DO identify the primary (most emphasised) topic
+- DO NOT miss topics that are clearly mentioned
+- DO return valid JSON array format (no markdown code blocks)`
 
-  const userPrompt = `Classify these ${comments.length} NPS comments. Return ONLY the JSON array, no markdown code blocks, no explanations.
+  const userPrompt = `Classify these ${comments.length} NPS comments using multi-topic extraction. Return ONLY the JSON array, no markdown code blocks, no explanations.
 
 ${comments.map((c, i) => `${i + 1}. ID: ${c.id}, Score: ${c.score}/10
    Comment: "${c.feedback}"`).join('\n\n')}`
@@ -212,11 +233,17 @@ ${comments.map((c, i) => `${i + 1}. ID: ${c.id}, Score: ${c.score}/10
       throw new Error('Response is not an array')
     }
 
-    // Validate each classification
+    // Validate each classification (new multi-topic format)
     classifications.forEach((c, index) => {
-      if (!c.id || !c.primary_topic || !c.sentiment || !c.topic_insight) {
-        throw new Error(`Classification ${index} missing required fields`)
+      if (!c.id || !c.primary_topic || !c.classifications || !Array.isArray(c.classifications)) {
+        throw new Error(`Classification ${index} missing required fields (id, primary_topic, classifications array)`)
       }
+      // Validate each topic within the classifications array
+      c.classifications.forEach((tc, tcIndex) => {
+        if (!tc.topic || !tc.sentiment || !tc.excerpt) {
+          throw new Error(`Classification ${index}, topic ${tcIndex} missing required fields (topic, sentiment, excerpt)`)
+        }
+      })
     })
 
   } catch (parseError) {
@@ -228,6 +255,7 @@ ${comments.map((c, i) => `${i + 1}. ID: ${c.id}, Score: ${c.score}/10
 
 /**
  * Store classifications in nps_topic_classifications table
+ * UPDATED: Now handles multi-topic format - creates one record per topic per response
  */
 async function storeClassifications(classifications) {
   // Normalize sentiment values to match database constraint
@@ -242,18 +270,50 @@ async function storeClassifications(classifications) {
     return 'neutral'
   }
 
-  // Convert classifications to database format
-  const records = classifications.map(c => ({
-    response_id: String(c.id),
-    topic_name: c.primary_topic,
-    sentiment: normalizeSentiment(c.sentiment),
-    confidence_score: c.confidence / 100, // Convert percentage to decimal
-    insight: c.topic_insight,
-    model_version: 'claude-sonnet-4',
-    classified_at: new Date().toISOString()
-  }))
+  // Flatten multi-topic classifications into individual database records
+  // Each comment may have 1-4 topics, each gets its own record
+  const records = []
+  const classifiedAt = new Date().toISOString()
 
-  // Insert records (ON CONFLICT DO NOTHING to handle duplicates gracefully)
+  for (const c of classifications) {
+    const responseId = String(c.id)
+    const confidence = (c.confidence || 85) / 100 // Convert percentage to decimal
+
+    // Track seen topics to avoid duplicates (AI sometimes returns same topic twice)
+    const seenTopics = new Set()
+
+    // Create a record for each topic extracted from this comment
+    for (const tc of c.classifications) {
+      // Skip duplicate topics for same response
+      const key = `${responseId}:${tc.topic}`
+      if (seenTopics.has(key)) {
+        console.log(`  ⚠️  Skipping duplicate topic "${tc.topic}" for response ${responseId}`)
+        continue
+      }
+      seenTopics.add(key)
+
+      const isPrimary = tc.topic === c.primary_topic
+
+      // Build insight with context about primary topic and overall sentiment
+      const insightParts = [tc.excerpt]
+      if (isPrimary) insightParts.push('[PRIMARY]')
+      if (c.overall_sentiment === 'mixed') insightParts.push('[MIXED OVERALL]')
+
+      records.push({
+        response_id: responseId,
+        topic_name: tc.topic,
+        sentiment: normalizeSentiment(tc.sentiment),
+        confidence_score: isPrimary ? confidence : confidence * 0.9, // Slightly lower confidence for secondary topics
+        insight: insightParts.join(' '),
+        model_version: 'claude-sonnet-4-multi',
+        classified_at: classifiedAt
+      })
+    }
+  }
+
+  console.log(`  📊 Flattened ${classifications.length} comments → ${records.length} topic records`)
+
+  // Insert records (ON CONFLICT updates to handle re-classifications)
   const { data, error } = await supabase
     .from('nps_topic_classifications')
     .upsert(records, {
@@ -346,7 +406,8 @@ async function runClassificationJob() {
     console.log()
     console.log('📊 CLASSIFICATION JOB SUMMARY\n')
     console.log(`Total Responses Processed: ${totalProcessed}`)
-    console.log(`Successfully Classified: ${totalSuccessful}`)
+    console.log(`Total Topic Records Stored: ${totalSuccessful}`)
+    console.log(`Average Topics per Response: ${totalProcessed > 0 ? (totalSuccessful / totalProcessed).toFixed(1) : 0}`)
     console.log(`Errors: ${totalErrors}`)
     console.log(`Duration: ${duration}s`)
     console.log(`Average: ${totalProcessed > 0 ? (duration / totalProcessed).toFixed(2) : 0}s per response`)
