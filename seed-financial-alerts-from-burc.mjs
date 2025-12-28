@@ -62,6 +62,28 @@ async function seedFinancialData() {
       ADD COLUMN IF NOT EXISTS due_date DATE;
     `);
 
+    // Update alert_type check constraint to include confirmed_churn
+    await client.query(`
+      ALTER TABLE financial_alerts
+      DROP CONSTRAINT IF EXISTS financial_alerts_alert_type_check;
+    `);
+    await client.query(`
+      ALTER TABLE financial_alerts
+      ADD CONSTRAINT financial_alerts_alert_type_check
+      CHECK (alert_type IN ('attrition_risk', 'confirmed_churn', 'renewal_due', 'renewal_overdue', 'upsell_opportunity', 'cpi_opportunity', 'payment_overdue', 'target_at_risk', 'business_case_stale'));
+    `);
+
+    // Update action_type check constraint to include client_offboarding
+    await client.query(`
+      ALTER TABLE financial_actions
+      DROP CONSTRAINT IF EXISTS financial_actions_action_type_check;
+    `);
+    await client.query(`
+      ALTER TABLE financial_actions
+      ADD CONSTRAINT financial_actions_action_type_check
+      CHECK (action_type IN ('client_retention', 'client_offboarding', 'renewal_preparation', 'upsell_pursuit', 'business_case_advance', 'payment_followup', 'escalation'));
+    `);
+
     // Clear existing data for re-seed
     await client.query('DELETE FROM financial_actions');
     await client.query('DELETE FROM financial_alerts');
@@ -74,14 +96,8 @@ async function seedFinancialData() {
     console.log('\n📋 Processing Attrition Risks...');
     const attrition = XLSX.utils.sheet_to_json(workbook.Sheets['Attrition'], { header: 1 });
 
-    // NOTE: Parkway removed - confirmed churn (no retention action needed)
+    // NOTE: Parkway, SingHealth, and NC/MinDef iPro clients are confirmed churns - moved to off-boarding section
     const attritionRisks = [
-      { client: 'SingHealth Sunrise', type: 'Full', revenue2026: 413000, totalAtRisk: 1100000, reason: 'Contract ends 2029' },
-      { client: 'KKH iPro', type: 'Full', revenue2026: 160000, totalAtRisk: 160000, reason: 'iPro services at risk' },
-      { client: 'SGH iPro', type: 'Full', revenue2026: 192000, totalAtRisk: 192000, reason: 'iPro services at risk' },
-      { client: 'NHCS iPro', type: 'Full', revenue2026: 77000, totalAtRisk: 77000, reason: 'iPro services at risk' },
-      { client: 'CGH iPro', type: 'Full', revenue2026: 99000, totalAtRisk: 99000, reason: 'iPro services at risk' },
-      { client: 'SKH iPro', type: 'Full', revenue2026: 61000, totalAtRisk: 61000, reason: 'iPro services at risk' },
       { client: 'GHA Regional Opal', type: 'Partial', revenue2026: 200000, totalAtRisk: 200000, reason: 'Regional consolidation risk' },
     ];
 
@@ -117,6 +133,49 @@ async function seedFinancialData() {
       });
     }
     console.log(`   ✅ ${attritionRisks.length} attrition risks`);
+
+    // 1b. CONFIRMED CHURNS - Off-boarding tracking
+    console.log('\n📋 Processing Confirmed Churns (Off-boarding)...');
+    const confirmedChurns = [
+      { client: 'SingHealth Sunrise', revenue2026: 413000, exitDate: '2029-12-31', reason: 'Contract ends 2029 - confirmed exit' },
+      { client: 'KKH iPro', revenue2026: 160000, exitDate: '2026-06-30', reason: 'NC/MinDef iPro consolidation - confirmed exit' },
+      { client: 'SGH iPro', revenue2026: 192000, exitDate: '2026-06-30', reason: 'NC/MinDef iPro consolidation - confirmed exit' },
+      { client: 'NHCS iPro', revenue2026: 77000, exitDate: '2026-06-30', reason: 'NC/MinDef iPro consolidation - confirmed exit' },
+      { client: 'CGH iPro', revenue2026: 99000, exitDate: '2026-06-30', reason: 'NC/MinDef iPro consolidation - confirmed exit' },
+      { client: 'SKH iPro', revenue2026: 61000, exitDate: '2026-06-30', reason: 'NC/MinDef iPro consolidation - confirmed exit' },
+    ];
+
+    for (const churn of confirmedChurns) {
+      alerts.push({
+        alert_type: 'confirmed_churn',
+        severity: 'medium',
+        priority_score: 50,
+        client_name: churn.client,
+        source_table: 'burc_attrition',
+        title: `Off-boarding: ${churn.client}`,
+        description: `Confirmed exit. ${churn.reason}. 2026 revenue impact: $${Math.round(churn.revenue2026/1000)}K`,
+        financial_impact: churn.revenue2026,
+        due_date: churn.exitDate,
+        recommended_actions: JSON.stringify([
+          { action: 'Plan knowledge transfer timeline', team: 'client_success' },
+          { action: 'Document lessons learned', team: 'client_success' },
+          { action: 'Ensure successful data handover', team: 'client_success' },
+          { action: 'Maintain positive relationship for future opportunities', team: 'leadership' }
+        ])
+      });
+
+      actions.push({
+        action_type: 'client_offboarding',
+        team: 'client_success',
+        client_name: churn.client,
+        title: `Successful off-boarding for ${churn.client}`,
+        description: `Plan and execute smooth transition. ${churn.reason}`,
+        revenue_at_stake: churn.revenue2026,
+        due_date: churn.exitDate,
+        urgency: 'normal'
+      });
+    }
+    console.log(`   ✅ ${confirmedChurns.length} confirmed churns for off-boarding`);
 
     // 2. CONTRACT RENEWALS with CPI opportunities
     console.log('\n📋 Processing Contract Renewals...');
