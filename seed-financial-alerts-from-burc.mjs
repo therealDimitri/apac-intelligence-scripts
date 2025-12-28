@@ -170,6 +170,8 @@ async function seedFinancialData() {
     console.log(`   ✅ ${renewals.length} contract renewals`);
 
     // 3. SALES PIPELINE from Dial 2 and PS sheets
+    // NOTE: Only includes clients verified in 2026 APAC Performance.xlsx BURC file
+    // Mock data for Mercy Health, Alfred Health, Monash Health, Peter Mac removed on 2025-12-28
     console.log('\n📋 Processing Sales Pipeline...');
     const pipeline = [
       { client: 'SA Health', opportunity: 'Meds Management', value: 4100000, status: 'Pipeline', probability: 60 },
@@ -180,10 +182,6 @@ async function seedFinancialData() {
       { client: 'SLMC', opportunity: 'Upgrade', value: 1400000, status: 'Pipeline', probability: 45 },
       { client: 'MAH', opportunity: 'SCM Upgrade', value: 1300000, status: 'Pipeline', probability: 40 },
       { client: 'Western Health', opportunity: 'SCM 25.1', value: 850000, status: 'Pipeline', probability: 50 },
-      { client: 'Mercy Health', opportunity: 'Theatre Upgrade', value: 780000, status: 'Pipeline', probability: 35 },
-      { client: 'Alfred Health', opportunity: 'AIMS Enhancement', value: 650000, status: 'Backlog', probability: 75 },
-      { client: 'Monash Health', opportunity: 'iPro Extension', value: 540000, status: 'Pipeline', probability: 60 },
-      { client: 'Peter Mac', opportunity: 'Oncology Module', value: 490000, status: 'Pipeline', probability: 55 },
     ];
 
     for (const opp of pipeline) {
@@ -219,13 +217,12 @@ async function seedFinancialData() {
     console.log(`   ✅ ${pipeline.length} pipeline opportunities`);
 
     // 4. CPI OPPORTUNITIES from maintenance data
+    // NOTE: Only includes clients with verified maintenance contracts in BURC
+    // Mock data for Alfred Health, Monash Health, Austin Health removed on 2025-12-28
     console.log('\n📋 Processing CPI Opportunities...');
     const cpiOpportunities = [
       { client: 'Epworth Healthcare', currentValue: 150000, cpiPotential: 4500, note: 'FY25 CPI pending' },
       { client: 'Western Health', currentValue: 126000, cpiPotential: 3780, note: 'FY26 renewal' },
-      { client: 'Alfred Health', currentValue: 112000, cpiPotential: 3360, note: 'Standard CPI' },
-      { client: 'Monash Health', currentValue: 98000, cpiPotential: 2940, note: 'Review contract' },
-      { client: 'Austin Health', currentValue: 87000, cpiPotential: 2610, note: 'Standard CPI' },
     ];
 
     for (const cpi of cpiOpportunities) {
