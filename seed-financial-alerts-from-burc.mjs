@@ -178,14 +178,15 @@ async function seedFinancialData() {
     console.log(`   ✅ ${confirmedChurns.length} confirmed churns for off-boarding`);
 
     // 2. CONTRACT RENEWALS with CPI opportunities
+    // NOTE: Data verified from "Opal Maint Contracts and Value" sheet in 2026 APAC Performance.xlsx on 2025-12-28
+    // Northern Health removed - not found in BURC file (was mock data)
     console.log('\n📋 Processing Contract Renewals...');
     const renewals = [
-      { client: 'Epworth Healthcare', solution: 'Opal', renewalDate: '2024-06-30', annualValue: 150000, notes: 'OVERDUE - renewal discussion required' },
-      { client: 'GHA', solution: 'Opal', renewalDate: '2024-09-30', annualValue: 125000, notes: 'OVERDUE - CPI increase opportunity' },
-      { client: 'Grampians Health', solution: 'Opal', renewalDate: '2024-10-31', annualValue: 145000, notes: 'OVERDUE - needs attention' },
-      { client: 'RVEEH', solution: 'Opal', renewalDate: '2024-11-30', annualValue: 29000, notes: 'OVERDUE - small but needs closure' },
-      { client: 'Western Health', solution: 'Opal', renewalDate: '2025-06-10', annualValue: 126000, notes: 'Upcoming - prepare CPI proposal' },
-      { client: 'Northern Health', solution: 'Opal', renewalDate: '2025-12-31', annualValue: 112000, notes: 'Prepare renewal strategy' },
+      { client: 'Epworth Healthcare', solution: 'Opal', renewalDate: '2025-11-15', annualValue: 234231, notes: 'EPH Opal Contract Renewal - Best Case in Dial 2' },
+      { client: 'GHA', solution: 'Opal', renewalDate: '2025-07-14', annualValue: 195060, notes: 'GHA Regional - If consolidation done then won\'t renew' },
+      { client: 'Grampians Health', solution: 'Opal', renewalDate: '2025-09-30', annualValue: 227291, notes: 'Includes one year auto-renewal' },
+      { client: 'RVEEH', solution: 'Opal', renewalDate: '2024-12-31', annualValue: 45392, notes: 'OVERDUE - 4% CPI to be applied year on year. Term was 1 Jul to 31 Dec 24' },
+      { client: 'Western Health', solution: 'Opal', renewalDate: '2026-07-31', annualValue: 197569, notes: '4% index applied in table and includes additional sites' },
     ];
 
     for (const renewal of renewals) {
@@ -276,12 +277,15 @@ async function seedFinancialData() {
     console.log(`   ✅ ${pipeline.length} pipeline opportunities`);
 
     // 4. CPI OPPORTUNITIES from maintenance data
-    // NOTE: Only includes clients with verified maintenance contracts in BURC
+    // NOTE: Values verified from "Opal Maint Contracts and Value" sheet in 2026 APAC Performance.xlsx on 2025-12-28
     // Mock data for Alfred Health, Monash Health, Austin Health removed on 2025-12-28
+    // CPI potential calculated at 3% of annual value
     console.log('\n📋 Processing CPI Opportunities...');
     const cpiOpportunities = [
-      { client: 'Epworth Healthcare', currentValue: 150000, cpiPotential: 4500, note: 'FY25 CPI pending' },
-      { client: 'Western Health', currentValue: 126000, cpiPotential: 3780, note: 'FY26 renewal' },
+      { client: 'Epworth Healthcare', currentValue: 234231, cpiPotential: 7027, note: 'EPH renewal Nov 2025 - CPI opportunity' },
+      { client: 'Western Health', currentValue: 197569, cpiPotential: 5927, note: '4% index applied in contract, includes additional sites' },
+      { client: 'Grampians Health', currentValue: 227291, cpiPotential: 6819, note: 'Auto-renewal - CPI opportunity' },
+      { client: 'RVEEH', currentValue: 45392, cpiPotential: 1362, note: '4% CPI clause in contract' },
     ];
 
     for (const cpi of cpiOpportunities) {
