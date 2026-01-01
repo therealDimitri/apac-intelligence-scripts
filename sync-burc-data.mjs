@@ -29,7 +29,8 @@ const BURC_PATH = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraD
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 async function syncBurcData() {
-  const databaseUrl = process.env.DATABASE_URL_DIRECT || process.env.DATABASE_URL;
+  // Use pooler connection (port 6543) as direct connection (port 5432) is often blocked
+  const databaseUrl = process.env.DATABASE_URL || process.env.DATABASE_URL_DIRECT;
 
   if (!databaseUrl) {
     console.error('❌ DATABASE_URL not found');
