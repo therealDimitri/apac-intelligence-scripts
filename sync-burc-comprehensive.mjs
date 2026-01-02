@@ -93,10 +93,10 @@ async function syncHistoricalRevenue() {
     const data = XLSX.utils.sheet_to_json(sheet, { header: 1 })
     const records = []
 
-    // Find header row (contains year columns)
+    // Find header row (row 1 has: Parent Company, Customer Name, Altera PnL Rollup, 2019, 2020...)
     let headerRow = -1
     for (let i = 0; i < Math.min(5, data.length); i++) {
-      if (data[i] && data[i].includes(2019)) {
+      if (data[i] && (data[i].includes(2019) || data[i].includes('2019'))) {
         headerRow = i
         break
       }
@@ -107,39 +107,56 @@ async function syncHistoricalRevenue() {
       return
     }
 
-    // Parse data rows
+    // Track current parent company and customer (they carry forward when null)
+    let currentParent = null
+    let currentCustomer = null
+
+    // Parse data rows - starting after header
     for (let i = headerRow + 1; i < data.length; i++) {
       const row = data[i]
-      if (!row || !row[1]) continue // Skip if no customer name
+      if (!row || row.length < 4) continue
 
-      const parentCompany = row[0] || null
-      const customerName = row[1]
+      // Update parent company if present (first column)
+      if (row[0] && row[0] !== 'Grand Total') {
+        currentParent = row[0]
+      }
+
+      // Update customer name if present (second column)
+      if (row[1]) {
+        currentCustomer = row[1]
+      }
+
+      // Get revenue type (third column)
       const revenueType = row[2]
 
-      if (!revenueType || revenueType === 'Grand Total') continue
+      // Skip if no revenue type, or if it's a total row, or we don't have a customer
+      if (!revenueType || revenueType === 'Grand Total' || !currentCustomer) continue
+      if (row[0] === 'Grand Total') continue
 
       // Map revenue types to standard names
       let mappedType = revenueType
-      if (revenueType.includes('Hardware')) mappedType = 'Hardware & Other Revenue'
-      if (revenueType.includes('License')) mappedType = 'License Revenue'
-      if (revenueType.includes('Maintenance')) mappedType = 'Maintenance Revenue'
-      if (revenueType.includes('Professional')) mappedType = 'Professional Services Revenue'
+      if (revenueType.includes('Hardware')) mappedType = 'Hardware'
+      else if (revenueType.includes('License')) mappedType = 'License'
+      else if (revenueType.includes('Maintenance')) mappedType = 'Maintenance'
+      else if (revenueType.includes('Professional')) mappedType = 'Professional Services'
 
       records.push({
-        parent_company: parentCompany,
-        customer_name: customerName,
+        parent_company: currentParent,
+        customer_name: currentCustomer,
         revenue_type: mappedType,
         year_2019: parseCurrency(row[3]),
         year_2020: parseCurrency(row[4]),
         year_2021: parseCurrency(row[5]),
         year_2022: parseCurrency(row[6]),
         year_2023: parseCurrency(row[7]),
-        year_2024: parseCurrency(row[8]) || 0,
+        year_2024: parseCurrency(row[8]),
         year_2025: 0, // Will be populated from 2025 data
         year_2026: 0, // Will be populated from 2026 data
         currency: 'USD'
       })
     }
+
+    console.log(`   Found ${records.length} revenue records`)
 
     if (records.length > 0) {
       // Delete existing and insert new
@@ -351,67 +368,90 @@ async function syncBusinessCases() {
 
   try {
     const workbook = XLSX.readFile(PERFORMANCE_FILE_2026)
-    const sheet = workbook.Sheets['Dial 2 Risk Profile Summary']
-
-    if (!sheet) {
-      console.log('   ⚠️ Dial 2 Risk Profile Summary sheet not found')
-      return
-    }
-
-    const data = XLSX.utils.sheet_to_json(sheet, { header: 1 })
     const records = []
 
-    let currentCategory = 'Best Case'
+    // Parse all revenue sheets: SW, PS, Maint, HW
+    const revenueSheets = [
+      { name: 'SW', type: 'sw' },
+      { name: 'PS', type: 'ps' },
+      { name: 'Maint', type: 'maint' },
+      { name: 'HW', type: 'hw' }
+    ]
 
-    for (let i = 3; i < data.length; i++) {
-      const row = data[i]
-      if (!row || !row[0]) continue
+    for (const sheetInfo of revenueSheets) {
+      const sheet = workbook.Sheets[sheetInfo.name]
+      if (!sheet) continue
 
-      const firstCol = row[0]
+      const data = XLSX.utils.sheet_to_json(sheet, { header: 1 })
 
-      // Detect category changes
-      if (firstCol.toLowerCase().includes('green') || firstCol.toLowerCase().includes('best case')) {
-        currentCategory = 'Best Case'
-        continue
-      }
-      if (firstCol.toLowerCase().includes('pipeline')) {
-        currentCategory = 'Pipeline'
-        continue
-      }
-      if (firstCol.toLowerCase().includes('business case')) {
-        currentCategory = 'Business Case'
-        continue
-      }
-      if (firstCol.toLowerCase().includes('total') || firstCol.toLowerCase().includes('rats')) {
-        continue
+      // Find header row (contains 'Status' and 'Revenue USD')
+      let headerRow = -1
+      for (let i = 0; i < Math.min(5, data.length); i++) {
+        if (data[i] && data[i].includes('Status')) {
+          headerRow = i
+          break
+        }
       }
 
-      // Parse opportunity
-      const opportunityName = firstCol
-      const forecastCategory = row[1] || currentCategory
-      const closureDate = excelDateToJSDate(row[2])
-      const oracleNumber = row[3] ? String(row[3]) : null
-      const swDate = excelDateToJSDate(row[4])
-      const psDate = excelDateToJSDate(row[5])
-      const maintDate = excelDateToJSDate(row[6])
-      const hwDate = excelDateToJSDate(row[7])
+      if (headerRow === -1) continue
 
-      if (opportunityName && opportunityName.length > 3) {
-        records.push({
-          opportunity_name: opportunityName,
-          forecast_category: forecastCategory === 'Best Case' ? 'Best Case' :
-                            forecastCategory === 'Pipeline' ? 'Pipeline' : 'Business Case',
-          closure_date: closureDate,
-          oracle_agreement_number: oracleNumber,
-          sw_revenue_date: swDate,
-          ps_revenue_date: psDate,
-          maint_revenue_date: maintDate,
-          hw_revenue_date: hwDate,
-          stage: 'active',
-          snapshot_month: '2026-01'
-        })
+      // Column indices based on header: Notes(0), Quote No(1), Status(2), APAC Client(3),
+      // Solution(4), Project(5), Install Begin(6), Revenue USD(7), COGS(8), % Revenue(9)
+
+      for (let i = headerRow + 1; i < data.length; i++) {
+        const row = data[i]
+        if (!row || row.length < 8) continue
+
+        const status = row[2]
+        const clientName = row[3]
+        const solution = row[4]
+        const project = row[5]
+        const installBegin = excelDateToJSDate(row[6])
+        const revenueUSD = parseCurrency(row[7])
+        const cogs = parseCurrency(row[8])
+        const probability = row[9] || 0.5
+
+        // Skip empty rows, backlog headers, or lost opportunities
+        if (!clientName || clientName === 'Backlog' || status === 'Lost') continue
+        if (!revenueUSD || revenueUSD === 0) continue
+
+        // Map status to forecast category
+        let forecastCategory = 'Pipeline'
+        if (status === 'Backlog') forecastCategory = 'Backlog'
+        else if (status === 'Best Case') forecastCategory = 'Best Case'
+        else if (status === 'Business Case') forecastCategory = 'Business Case'
+
+        // Check if this opportunity already exists (aggregate by client + project)
+        const existingIdx = records.findIndex(r =>
+          r.client_name === clientName && r.opportunity_name === (project || solution)
+        )
+
+        if (existingIdx >= 0) {
+          // Add to existing record
+          if (sheetInfo.type === 'sw') records[existingIdx].estimated_sw_value += revenueUSD
+          if (sheetInfo.type === 'ps') records[existingIdx].estimated_ps_value += revenueUSD
+          if (sheetInfo.type === 'maint') records[existingIdx].estimated_maint_value += revenueUSD
+          if (sheetInfo.type === 'hw') records[existingIdx].estimated_hw_value += revenueUSD
+        } else {
+          // Create new record
+          records.push({
+            opportunity_name: project || solution || `${clientName} - ${sheetInfo.name}`,
+            client_name: clientName,
+            forecast_category: forecastCategory,
+            closure_date: installBegin,
+            estimated_sw_value: sheetInfo.type === 'sw' ? revenueUSD : 0,
+            estimated_ps_value: sheetInfo.type === 'ps' ? revenueUSD : 0,
+            estimated_maint_value: sheetInfo.type === 'maint' ? revenueUSD : 0,
+            estimated_hw_value: sheetInfo.type === 'hw' ? revenueUSD : 0,
+            probability: typeof probability === 'number' ? Math.min(probability, 1) : 0.5,
+            stage: 'active',
+            snapshot_month: '2026-01'
+          })
+        }
       }
     }
+
+    console.log(`   Found ${records.length} pipeline opportunities`)
 
     if (records.length > 0) {
       await supabase.from('burc_business_cases').delete().eq('snapshot_month', '2026-01')
