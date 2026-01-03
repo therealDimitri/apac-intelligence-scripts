@@ -30,8 +30,13 @@ const supabase = createClient(
 )
 
 // Configuration
-const BURC_PATH = '/tmp/burc-source/BURC'
-const SOURCE_FILE = join(BURC_PATH, '2026', '2026 APAC Performance.xlsx')
+// Primary: Local OneDrive sync path (auto-synced from SharePoint)
+// Main file in BURC/2026 folder (not Budget Planning subfolder)
+const ONEDRIVE_SOURCE = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Leadership Team - General/Performance/Financials/BURC/2026/2026 APAC Performance.xlsx'
+// Fallback: Manual extraction path
+const FALLBACK_SOURCE = '/tmp/burc-source/BURC/2026/2026 APAC Performance.xlsx'
+// Use OneDrive path if available, otherwise fallback
+const SOURCE_FILE = fs.existsSync(ONEDRIVE_SOURCE) ? ONEDRIVE_SOURCE : FALLBACK_SOURCE
 
 const args = process.argv.slice(2)
 const DRY_RUN = args.includes('--dry-run')
