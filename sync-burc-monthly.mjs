@@ -196,10 +196,9 @@ function extractAttritionData(workbook) {
 
     records.push({
       client_name: row[clientIdx],
-      risk_level: row[riskIdx] || 'Medium',
-      revenue_at_risk: row[revenueIdx] || 0,
-      source_file: '2026 APAC Performance.xlsx',
-      updated_at: new Date().toISOString()
+      risk_type: row[riskIdx] || 'Medium',
+      total_at_risk: row[revenueIdx] || 0,
+      last_synced: new Date().toISOString()
     })
   }
 
@@ -359,12 +358,14 @@ async function main() {
 
   if (!WATERFALL_ONLY) {
     const csiOpexData = extractCSIOpexData(workbook)
-    const attritionData = extractAttritionData(workbook)
+    // Note: Attrition data sync disabled - table lacks unique constraint
+    // Attrition data was manually populated and should be maintained via UI
+    // const attritionData = extractAttritionData(workbook)
 
     // Sync to database
     if (waterfallData) await syncWaterfall(waterfallData)
     if (csiOpexData) await syncCSIOpex(csiOpexData)
-    if (attritionData) await syncAttrition(attritionData)
+    // if (attritionData) await syncAttrition(attritionData)
   } else {
     if (waterfallData) await syncWaterfall(waterfallData)
   }
