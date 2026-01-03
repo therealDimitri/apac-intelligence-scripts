@@ -220,6 +220,7 @@ async function syncWaterfall(data) {
     return
   }
 
+  // Database stores categories as snake_case field names, not display names
   const fieldMappings = {
     backlog_runrate: 'Backlog/Runrate',
     committed_gross_rev: 'Committed Gross Rev',
@@ -230,18 +231,21 @@ async function syncWaterfall(data) {
     target_ebita: 'Target EBITA'
   }
 
-  for (const [field, category] of Object.entries(fieldMappings)) {
+  for (const [field, displayName] of Object.entries(fieldMappings)) {
     if (data[field] === null) continue
 
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from('burc_waterfall')
       .update({ amount: data[field], updated_at: new Date().toISOString() })
-      .eq('category', category)
+      .eq('category', field)  // Use field name (snake_case) as that's what DB stores
+      .select()
 
     if (error) {
-      console.log(`  ❌ Error updating ${category}: ${error.message}`)
+      console.log(`  ❌ Error updating ${displayName}: ${error.message}`)
+    } else if (!updated || updated.length === 0) {
+      console.log(`  ⚠️ ${displayName}: No matching row found for category '${field}'`)
     } else {
-      console.log(`  ✅ ${category}: ${formatCurrency(data[field])}`)
+      console.log(`  ✅ ${displayName}: ${formatCurrency(data[field])}`)
     }
   }
 }
