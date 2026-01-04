@@ -13,8 +13,13 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 // Direct database connection (bypass connection pooler for DDL)
-const DATABASE_URL = process.env.DATABASE_URL_DIRECT ||
-  'postgresql://postgres:***REMOVED***@db.usoyxsunetvxdjdglkmn.supabase.co:5432/postgres'
+// Set DATABASE_URL_DIRECT in .env.local: postgresql://postgres:[password]@db.[project-ref].supabase.co:5432/postgres
+const DATABASE_URL = process.env.DATABASE_URL_DIRECT || process.env.DATABASE_URL
+
+if (!DATABASE_URL) {
+  console.error('❌ Missing DATABASE_URL_DIRECT or DATABASE_URL environment variable')
+  process.exit(1)
+}
 
 async function applyMigration() {
   const client = new pg.Client({ connectionString: DATABASE_URL })

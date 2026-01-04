@@ -84,9 +84,10 @@ async function syncHistoricalRevenue() {
 
   try {
     const workbook = XLSX.readFile(filePath)
-    const sheet = workbook.Sheets['Customer Level Summary']
+    // Use Sheet1 which has complete client-level breakdown (Customer Level Summary only has SA Health)
+    const sheet = workbook.Sheets['Sheet1'] || workbook.Sheets['Customer Level Summary']
     if (!sheet) {
-      console.log('   ⚠️ Customer Level Summary sheet not found')
+      console.log('   ⚠️ Revenue data sheet not found')
       return
     }
 

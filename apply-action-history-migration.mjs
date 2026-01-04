@@ -20,7 +20,7 @@ const DATABASE_URL = process.env.DATABASE_URL_DIRECT || process.env.SUPABASE_DB_
 if (!DATABASE_URL) {
   console.error('❌ Missing DATABASE_URL environment variable')
   console.log('Please add DATABASE_URL to .env.local')
-  console.log('Format: postgresql://postgres:[password]@[host]:5432/postgres')
+  console.log('Format: postgres://user:pass@host:port/database')
   process.exit(1)
 }
 
@@ -84,8 +84,7 @@ async function main() {
     console.error('\n❌ Migration failed:', err.message)
 
     if (err.message.includes('pg_hba.conf')) {
-      console.log('\n📝 Connection rejected. Try using the pooler URL:')
-      console.log('   DATABASE_URL=postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres')
+      console.log('\n📝 Connection rejected. Try using the Supabase pooler URL from your dashboard.')
     }
 
     console.log('\n📝 Or run the SQL manually:')

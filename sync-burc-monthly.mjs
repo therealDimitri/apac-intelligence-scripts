@@ -30,13 +30,16 @@ const supabase = createClient(
 )
 
 // Configuration
-// Primary: Local OneDrive sync path (auto-synced from SharePoint)
-// Main file in BURC/2026 folder (not Budget Planning subfolder)
-const ONEDRIVE_SOURCE = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Leadership Team - General/Performance/Financials/BURC/2026/2026 APAC Performance.xlsx'
+// Primary: Budget Planning file (has full forecast with pre-calculated CSI ratios)
+const BUDGET_PLANNING_SOURCE = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Leadership Team - Performance/Financials/BURC/2026/Budget Planning/2026 APAC Performance.xlsx'
+// Secondary: General folder (may have different data)
+const GENERAL_SOURCE = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Leadership Team - General/Performance/Financials/BURC/2026/2026 APAC Performance.xlsx'
 // Fallback: Manual extraction path
 const FALLBACK_SOURCE = '/tmp/burc-source/BURC/2026/2026 APAC Performance.xlsx'
-// Use OneDrive path if available, otherwise fallback
-const SOURCE_FILE = fs.existsSync(ONEDRIVE_SOURCE) ? ONEDRIVE_SOURCE : FALLBACK_SOURCE
+// Use Budget Planning file first (has forecast CSI ratios), then General, then fallback
+const SOURCE_FILE = fs.existsSync(BUDGET_PLANNING_SOURCE) ? BUDGET_PLANNING_SOURCE
+  : fs.existsSync(GENERAL_SOURCE) ? GENERAL_SOURCE
+  : FALLBACK_SOURCE
 
 const args = process.argv.slice(2)
 const DRY_RUN = args.includes('--dry-run')
@@ -119,49 +122,125 @@ function extractWaterfallData(workbook) {
 }
 
 /**
- * Extract CSI OPEX data from source file
+ * Extract CSI Ratios and OPEX data from APAC BURC sheet
+ * Uses pre-calculated ratios from rows 119-125 of the Budget Planning file
  */
 function extractCSIOpexData(workbook) {
-  console.log('\n📊 Extracting CSI OPEX Data...')
+  console.log('\n📊 Extracting CSI Data from APAC BURC sheet...')
 
-  const data = getSheetData(workbook, 'APAC BURC - Monthly NR Comp')
+  const data = getSheetData(workbook, 'APAC BURC')
   if (!data) {
-    console.log('  ⚠️ Monthly NR Comp sheet not found')
+    console.log('  ⚠️ APAC BURC sheet not found')
     return null
   }
 
-  const months = data[0] || []
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
   const records = []
 
-  // Find License, PS, and Maintenance Actual rows
-  const findActualRow = (startIdx, endIdx) => {
-    for (let i = startIdx; i < Math.min(endIdx, data.length); i++) {
-      if (data[i] && data[i][0] === 'Actual') return data[i]
+  // Row indices in APAC BURC sheet (0-indexed):
+  // Row 10 (idx 9): Gross License Revenue
+  // Row 11 (idx 10): Gross PS Revenue
+  // Row 12 (idx 11): Gross Maintenance Revenue
+  // Row 57 (idx 56): License NR
+  // Row 58 (idx 57): PS NR
+  // Row 59 (idx 58): Maintenance NR
+  // Row 61 (idx 60): Net Revenue Excluding Pipeline
+  // Row 69 (idx 68): PS OPEX
+  // Row 75 (idx 74): Maintenance OPEX
+  // Row 80 (idx 79): S&M OPEX
+  // Row 86 (idx 85): R&D OPEX
+  // Row 87 (idx 86): G&A OPEX
+  // Row 120 (idx 119): CSI Ratio header
+  // Row 121 (idx 120): Customer Service (Maint) ratio
+  // Row 122 (idx 121): Sales & Marketing ratio
+  // Row 123 (idx 122): R&D ratio
+  // Row 124 (idx 123): Professional Services ratio
+  // Row 125 (idx 124): Administration (G&A) ratio
+
+  // Find rows by label for more robust matching
+  const findRowByLabel = (searchTerm) => {
+    for (let i = 0; i < data.length; i++) {
+      if (data[i] && data[i][0] && String(data[i][0]).toLowerCase().includes(searchTerm.toLowerCase())) {
+        return data[i]
+      }
     }
     return null
   }
 
-  const licenseActual = findActualRow(2, 6)
-  const psActual = findActualRow(7, 11)
-  const maintActual = findActualRow(12, 16)
+  // Get revenue and OPEX rows
+  const licenseNRRow = findRowByLabel('License NR') || data[56]
+  const psNRRow = findRowByLabel('Professional Service NR') || data[57]
+  const maintNRRow = findRowByLabel('Maintenance NR') || data[58]
+  const totalNRRow = findRowByLabel('Net Revenue Excluding Pipeline') || data[60]
+  const psOpexRow = findRowByLabel('Professional Services (less Depr) - OPEX') || data[68]
+  const maintOpexRow = findRowByLabel('Maintenance (less Depr) - OPEX') || data[74]
+  const smOpexRow = findRowByLabel('Sales & Marketing (less Depr) - OPEX') || data[79]
+  const rdOpexRow = findRowByLabel('Research & Development (less Depr)') || data[85]
+  const gaOpexRow = findRowByLabel('General & Administration (less Depr)') || data[86]
 
-  for (let i = 1; i <= 12; i++) {
-    const month = months[i]
-    if (!month) continue
+  // Get pre-calculated CSI ratios (these are the official BURC forecasts)
+  const maintRatioRow = findRowByLabel('Customer Service (>4)')
+  const salesRatioRow = findRowByLabel('Sales & Marketing (>1)')
+  const rdRatioRow = findRowByLabel('R&D (>1)')
+  const psRatioRow = findRowByLabel('Professional Services (>2)')
+  const gaRatioRow = findRowByLabel('Administration <=20%')
 
-    records.push({
+  console.log('  Found CSI ratio rows:')
+  console.log('    - Maint (Customer Service):', maintRatioRow ? '✓' : '✗')
+  console.log('    - Sales & Marketing:', salesRatioRow ? '✓' : '✗')
+  console.log('    - R&D:', rdRatioRow ? '✓' : '✗')
+  console.log('    - PS:', psRatioRow ? '✓' : '✗')
+  console.log('    - G&A (Admin):', gaRatioRow ? '✓' : '✗')
+
+  // Column mapping in APAC BURC sheet:
+  // Column A (index 0) = Row labels
+  // Column B (index 1) = "YTD Actual" or "Total" header
+  // Column C (index 2) = Jan data
+  // Column D (index 3) = Feb data, etc.
+  for (let m = 1; m <= 12; m++) {
+    const colIdx = m + 1  // Column index: m=1 (Jan) → colIdx=2 (Column C)
+
+    // Get values, handling nulls
+    const getValue = (row, idx) => {
+      if (!row) return 0
+      const val = row[idx]
+      return (val !== null && val !== undefined && typeof val === 'number') ? val : 0
+    }
+
+    const record = {
       year: 2026,
-      month_num: i,
-      month: month,
-      license_nr: licenseActual?.[i] || 0,
-      ps_nr: psActual?.[i] || 0,
-      maintenance_nr: maintActual?.[i] || 0,
-      source_file: '2026 APAC Performance.xlsx',
+      month_num: m,
+      month: monthNames[m - 1],
+      // Net Revenue values
+      license_nr: getValue(licenseNRRow, colIdx),
+      ps_nr: getValue(psNRRow, colIdx),
+      maintenance_nr: getValue(maintNRRow, colIdx),
+      total_nr: getValue(totalNRRow, colIdx),
+      // OPEX values
+      ps_opex: getValue(psOpexRow, colIdx),
+      maintenance_opex: getValue(maintOpexRow, colIdx),
+      sm_opex: getValue(smOpexRow, colIdx),
+      rd_opex: getValue(rdOpexRow, colIdx),
+      ga_opex: getValue(gaOpexRow, colIdx),
+      // Pre-calculated CSI ratios from BURC
+      burc_maint_ratio: getValue(maintRatioRow, colIdx),
+      burc_sales_ratio: getValue(salesRatioRow, colIdx),
+      burc_rd_ratio: getValue(rdRatioRow, colIdx),
+      burc_ps_ratio: getValue(psRatioRow, colIdx),
+      burc_ga_ratio: getValue(gaRatioRow, colIdx),
+      source_file: '2026 APAC Performance.xlsx (Budget Planning)',
       updated_at: new Date().toISOString()
-    })
+    }
+
+    records.push(record)
+
+    // Log non-zero ratio values
+    if (record.burc_sales_ratio > 0) {
+      console.log(`  ${monthNames[m-1]}: Sales Ratio = ${record.burc_sales_ratio.toFixed(2)}`)
+    }
   }
 
-  console.log(`  Found ${records.length} monthly records`)
+  console.log(`  Extracted ${records.length} monthly records with pre-calculated CSI ratios`)
   return records
 }
 
@@ -262,9 +341,12 @@ async function syncCSIOpex(records) {
   }
 
   for (const record of records) {
+    // Only include columns that exist in the table (exclude burc_*_ratio columns)
+    const { burc_maint_ratio, burc_sales_ratio, burc_rd_ratio, burc_ps_ratio, burc_ga_ratio, ...opexRecord } = record
+
     const { error } = await supabase
       .from('burc_csi_opex')
-      .upsert(record, {
+      .upsert(opexRecord, {
         onConflict: 'year,month_num',
         ignoreDuplicates: false
       })
@@ -275,6 +357,67 @@ async function syncCSIOpex(records) {
   }
 
   console.log(`  ✅ Synced ${records.length} monthly CSI OPEX records`)
+}
+
+/**
+ * Sync pre-calculated CSI Ratios from BURC to burc_csi_ratios table
+ * This overwrites the calculated values with the official BURC forecast ratios
+ */
+async function syncCSIRatios(records) {
+  console.log('\n🔄 Syncing Pre-calculated CSI Ratios from BURC...')
+
+  if (DRY_RUN) {
+    console.log(`  [DRY RUN] Would update ${records.length} records in burc_csi_ratios`)
+    records.forEach(r => {
+      if (r.burc_sales_ratio > 0 || r.burc_ps_ratio > 0) {
+        console.log(`    ${r.month}: Sales=${r.burc_sales_ratio?.toFixed(2)}, PS=${r.burc_ps_ratio?.toFixed(2)}, Maint=${r.burc_maint_ratio?.toFixed(2)}`)
+      }
+    })
+    return
+  }
+
+  let updated = 0
+  for (const record of records) {
+    // Map BURC ratio values to database columns
+    // Note: BURC G&A is a percentage (e.g., 17.58), store as-is
+    const ratioData = {
+      year: record.year,
+      month_num: record.month_num,
+      ps_ratio: record.burc_ps_ratio || 0,
+      sales_ratio: record.burc_sales_ratio || 0,
+      maintenance_ratio: record.burc_maint_ratio || 0,
+      rd_ratio: record.burc_rd_ratio || 0,
+      ga_ratio: record.burc_ga_ratio || 0,
+      // Calculate status based on targets
+      ps_status: (record.burc_ps_ratio >= 2) ? 'green' : (record.burc_ps_ratio >= 1.5) ? 'amber' : 'red',
+      sales_status: (record.burc_sales_ratio >= 1) ? 'green' : (record.burc_sales_ratio >= 0.5) ? 'amber' : 'red',
+      maintenance_status: (record.burc_maint_ratio >= 4) ? 'green' : (record.burc_maint_ratio >= 3) ? 'amber' : 'red',
+      rd_status: (record.burc_rd_ratio >= 1) ? 'green' : (record.burc_rd_ratio >= 0.5) ? 'amber' : 'red',
+      ga_status: (record.burc_ga_ratio <= 20) ? 'green' : (record.burc_ga_ratio <= 25) ? 'amber' : 'red',
+      calculated_at: new Date().toISOString()
+    }
+
+    const { error } = await supabase
+      .from('burc_csi_ratios')
+      .upsert(ratioData, {
+        onConflict: 'year,month_num',
+        ignoreDuplicates: false
+      })
+
+    if (error) {
+      console.log(`  ❌ Error upserting ${record.month}: ${error.message}`)
+    } else {
+      updated++
+    }
+  }
+
+  console.log(`  ✅ Updated ${updated} monthly CSI ratios with BURC forecast values`)
+
+  // Show sample of key values
+  const jan = records.find(r => r.month_num === 1)
+  if (jan) {
+    console.log(`  📊 Jan 2026 ratios: PS=${jan.burc_ps_ratio?.toFixed(2)}, Sales=${jan.burc_sales_ratio?.toFixed(2)}, Maint=${jan.burc_maint_ratio?.toFixed(2)}`)
+  }
 }
 
 /**
@@ -368,7 +511,11 @@ async function main() {
 
     // Sync to database
     if (waterfallData) await syncWaterfall(waterfallData)
-    if (csiOpexData) await syncCSIOpex(csiOpexData)
+    if (csiOpexData) {
+      await syncCSIOpex(csiOpexData)
+      // Also sync the pre-calculated CSI ratios to burc_csi_ratios table
+      await syncCSIRatios(csiOpexData)
+    }
     // if (attritionData) await syncAttrition(attritionData)
   } else {
     if (waterfallData) await syncWaterfall(waterfallData)
