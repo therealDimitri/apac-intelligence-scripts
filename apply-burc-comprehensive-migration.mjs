@@ -13,7 +13,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 // Direct database connection (bypass connection pooler for DDL)
-// Set DATABASE_URL_DIRECT in .env.local: postgresql://postgres:[password]@db.[project-ref].supabase.co:5432/postgres
+// Set DATABASE_URL_DIRECT in .env.local with your direct Supabase connection
 const DATABASE_URL = process.env.DATABASE_URL_DIRECT || process.env.DATABASE_URL
 
 if (!DATABASE_URL) {

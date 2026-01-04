@@ -17,12 +17,14 @@ dotenv.config({ path: join(__dirname, '..', '.env.local') });
 
 const { Pool } = pg;
 
-// Use Supabase direct connection
-// Format: postgresql://postgres:[password]@db.[project-ref].supabase.co:5432/postgres
-const originalUrl = process.env.DATABASE_URL;
-const password = originalUrl.match(/postgres\.usoyxsunetvxdjdglkmn:([^@]+)@/)?.[1] || '';
-const projectRef = 'usoyxsunetvxdjdglkmn';
-const connectionString = `postgresql://postgres:${password}@db.${projectRef}.supabase.co:5432/postgres`;
+// Use direct database connection (bypass pooler for DDL operations)
+// Set DATABASE_URL_DIRECT in .env.local for direct Supabase connection
+const connectionString = process.env.DATABASE_URL_DIRECT || process.env.DATABASE_URL;
+
+if (!connectionString) {
+  console.error('❌ Missing DATABASE_URL_DIRECT or DATABASE_URL environment variable');
+  process.exit(1);
+}
 
 console.log('Connecting to database...');
 
