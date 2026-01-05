@@ -34,10 +34,22 @@ const supabase = createClient(supabaseUrl, supabaseKey)
 
 const BURC_FILE = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Leadership Team - General/Performance/Financials/BURC/2026/2026 APAC Performance.xlsx'
 
-// Probability weights by forecast category
-const PROBABILITY_WEIGHTS = {
+// Probability weights by section COLOR (for Dial 2 items)
+// Green = High probability to close
+// Yellow = Mid-range probability
+// Red = Unlikely to close
+const SECTION_PROBABILITY = {
+  'GREEN': 0.9,      // High probability
+  'YELLOW': 0.5,     // Mid-range
+  'RED': 0.2,        // Unlikely
+  'BUSINESS_CASE': 0.5,
+  'PIPELINE': 0.3
+}
+
+// Category-based probability for Rats & Mice items (no color sections)
+const CATEGORY_PROBABILITY = {
   'best case': 0.9,
-  'bus case': 0.5,
+  'business case': 0.5,
   'pipeline': 0.3
 }
 
@@ -93,7 +105,7 @@ async function syncPipelineData() {
     // Skip Lost/Closed deals
     if (category === 'EXCLUDE') continue
 
-    const probability = PROBABILITY_WEIGHTS[fcast] || 0.3
+    const probability = CATEGORY_PROBABILITY[fcast] || 0.3
 
     pipelineRecords.push({
       deal_name: name,
@@ -121,19 +133,35 @@ async function syncPipelineData() {
   const d2Data = XLSX.utils.sheet_to_json(d2Sheet, { header: 1 })
 
   let dial2Count = 0
-  for (let i = 4; i < d2Data.length; i++) {
+  let currentSection = 'GREEN' // Default to green section at start
+
+  for (let i = 3; i < d2Data.length; i++) {
     const row = d2Data[i]
     if (!row || !row[0]) continue
 
     const name = String(row[0]).trim()
+
+    // Track section changes based on header rows (determines probability weighting)
+    if (name.includes('Green:')) { currentSection = 'GREEN'; continue }
+    if (name.includes('Yellow:')) { currentSection = 'YELLOW'; continue }
+    if (name.includes('Red:')) { currentSection = 'RED'; continue }
+    if (name.includes('Business Case Related')) { currentSection = 'BUSINESS_CASE'; continue }
+    if (name.includes('Pipeline - NOT')) { currentSection = 'PIPELINE'; continue }
+    if (name.includes('Closed in 2026') || name.includes('Lost or missed')) { currentSection = 'EXCLUDE'; continue }
+
     // Skip summary rows and collated R&M (already captured from R&M sheet)
-    if (name.includes('Total') || name.includes('Yellow:') || name.includes('Red:') ||
-        name.includes('Green:') || name.includes('Business Case Related') ||
-        name.includes('Rats and Mice - Collated')) continue
+    if (name.includes('Total') || name.includes('Anything') ||
+        name.includes('Rats and Mice - Collated') || name.includes('Professional Services Backlog')) continue
+
+    // Skip excluded sections (Closed, Lost)
+    if (currentSection === 'EXCLUDE') continue
 
     const fcast = (row[1] || '').toString().toLowerCase()
     const closureDate = excelDateToISO(row[2])
     const oracleNum = row[3] || ''
+
+    // Skip items explicitly marked as Lost
+    if (fcast.includes('lost')) continue
 
     const key = `${name}|${oracleNum}`
     if (seenKeys.has(key)) continue
@@ -145,13 +173,13 @@ async function syncPipelineData() {
     const hw = parseCurrency(row[11])
     const totalRevenue = sw + ps + maint + hw
 
+    // Allow negative values (reversals) but skip zero
     if (totalRevenue === 0) continue
 
     const category = normaliseForecast(fcast)
-    // Skip Lost/Closed deals
-    if (category === 'EXCLUDE') continue
 
-    const probability = PROBABILITY_WEIGHTS[fcast] || 0.3
+    // Use section-based probability (Green=90%, Yellow=50%, Red=20%)
+    const probability = SECTION_PROBABILITY[currentSection] || 0.3
 
     pipelineRecords.push({
       deal_name: name,
@@ -175,8 +203,16 @@ async function syncPipelineData() {
   console.log(`   Found ${dial2Count} Dial 2 items`)
   console.log(`   Total pipeline items: ${pipelineRecords.length}`)
 
-  // Calculate totals
-  const totalPipeline = pipelineRecords.reduce((sum, r) => sum + r.total_revenue, 0)
+  // Count by forecast category
+  const categoryCount = pipelineRecords.reduce((acc, r) => {
+    acc[r.forecast_category] = (acc[r.forecast_category] || 0) + 1
+    return acc
+  }, {})
+  console.log('   By Category:', categoryCount)
+
+  // Calculate totals (sum individual revenue fields since total_revenue is a generated column)
+  const totalPipeline = pipelineRecords.reduce((sum, r) =>
+    sum + r.sw_revenue + r.ps_revenue + r.maint_revenue + r.hw_revenue, 0)
   const weightedPipeline = pipelineRecords.reduce((sum, r) => sum + r.weighted_revenue, 0)
 
   console.log(`   Total Pipeline Value: $${totalPipeline.toLocaleString()}`)
