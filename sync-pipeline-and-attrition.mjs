@@ -89,12 +89,16 @@ async function syncPipelineData() {
 
     if (totalRevenue === 0) continue
 
+    const category = normaliseForecast(fcast)
+    // Skip Lost/Closed deals
+    if (category === 'EXCLUDE') continue
+
     const probability = PROBABILITY_WEIGHTS[fcast] || 0.3
 
     pipelineRecords.push({
       deal_name: name,
       client_name: extractClientName(name),
-      forecast_category: normaliseForecast(fcast),
+      forecast_category: category,
       closure_date: closureDate,
       sw_revenue: sw,
       ps_revenue: ps,
@@ -143,12 +147,16 @@ async function syncPipelineData() {
 
     if (totalRevenue === 0) continue
 
+    const category = normaliseForecast(fcast)
+    // Skip Lost/Closed deals
+    if (category === 'EXCLUDE') continue
+
     const probability = PROBABILITY_WEIGHTS[fcast] || 0.3
 
     pipelineRecords.push({
       deal_name: name,
       client_name: extractClientName(name),
-      forecast_category: normaliseForecast(fcast),
+      forecast_category: category,
       closure_date: closureDate,
       sw_revenue: sw,
       ps_revenue: ps,
@@ -306,6 +314,7 @@ function normaliseForecast(fcast) {
   const f = fcast.toLowerCase()
   if (f.includes('best')) return 'Best Case'
   if (f.includes('bus')) return 'Business Case'
+  if (f.includes('lost') || f.includes('closed')) return 'EXCLUDE' // Lost/closed deals
   return 'Pipeline'
 }
 
