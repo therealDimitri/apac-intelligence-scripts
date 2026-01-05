@@ -1,16 +1,34 @@
 #!/usr/bin/env node
 /**
- * Sync Pipeline and Attrition data from 2026 APAC Performance.xlsx
+ * Sync Net Bookings and Attrition data from 2026 APAC Performance.xlsx
  *
- * Sources:
- * - Pipeline: "Rats and Mice Only" sheet (<50K items) + "Dial 2 Risk Profile Summary" (>=50K items)
- * - Attrition: "Attrition" sheet for confirmed revenue at risk
- * - Renewals: Derived from "Opal Maint Contracts and Value" sheet
+ * ═══════════════════════════════════════════════════════════════════════════
+ * METHODOLOGY
+ * ═══════════════════════════════════════════════════════════════════════════
  *
- * Weighted Pipeline Calculation:
- * - Best Case: 90% probability
- * - Business Case: 50% probability
- * - Pipeline: 30% probability
+ * DATA SOURCES:
+ * - "Rats and Mice Only" sheet: Opportunities < $50K
+ * - "Dial 2 Risk Profile Summary" sheet: Opportunities >= $50K
+ * - "Attrition" sheet: Confirmed revenue at risk
+ *
+ * BOOKING VALUE HIERARCHY:
+ * 1. Primary: "Total Net Booking" (column 24) - Net after COGS/margin deduction
+ * 2. Fallback: "Bookings ACV" (column 17) - Annual Contract Value (if Net Booking is empty)
+ * Note: Values in Excel are in $M (millions), converted to dollars by × 1,000,000
+ *
+ * PROBABILITY WEIGHTING (by section colour in Dial 2 sheet):
+ * - GREEN section:    90% probability (high likelihood to close)
+ * - YELLOW section:   50% probability (mid-range likelihood)
+ * - RED section:      20% probability (unlikely to close)
+ * - Business Case:    50% probability
+ * - Pipeline:         30% probability
+ *
+ * CALCULATIONS:
+ * - Total Net Booking = Sum of all booking values
+ * - Weighted Net Booking = Sum of (booking value × probability)
+ * - Net Impact = Weighted Net Booking - Revenue at Risk
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
  */
 
 import { createClient } from '@supabase/supabase-js'
@@ -93,19 +111,36 @@ async function syncPipelineData() {
     if (seenKeys.has(key)) continue
     seenKeys.add(key)
 
-    const sw = parseCurrency(row[8])
-    const ps = parseCurrency(row[9])
-    const maint = parseCurrency(row[10])
-    const hw = parseCurrency(row[11])
-    const totalRevenue = sw + ps + maint + hw
+    // BOOKING VALUE HIERARCHY:
+    // 1. Primary: Total Net Booking (column 24) - after COGS/margin
+    // 2. Fallback: Bookings ACV (column 17) - if Net Booking is empty
+    // Values are in $M, multiply by 1,000,000 to convert to dollars
+    const netBookingRaw = parseCurrency(row[24])
+    const bookingsAcvRaw = parseCurrency(row[17])
 
-    if (totalRevenue === 0) continue
+    let netBooking = netBookingRaw * 1000000
+    let bookingSource = 'Net Booking'
+
+    // Fallback to Bookings ACV if Net Booking is zero/empty
+    if (netBooking === 0 && bookingsAcvRaw !== 0) {
+      netBooking = bookingsAcvRaw * 1000000
+      bookingSource = 'Bookings ACV'
+    }
+
+    // Skip if still zero after fallback
+    if (netBooking === 0) continue
 
     const category = normaliseForecast(fcast)
     // Skip Lost/Closed deals
     if (category === 'EXCLUDE') continue
 
     const probability = CATEGORY_PROBABILITY[fcast] || 0.3
+
+    // Also capture individual revenue components for breakdown (columns 8-11)
+    const sw = parseCurrency(row[8])
+    const ps = parseCurrency(row[9])
+    const maint = parseCurrency(row[10])
+    const hw = parseCurrency(row[11])
 
     pipelineRecords.push({
       deal_name: name,
@@ -116,11 +151,12 @@ async function syncPipelineData() {
       ps_revenue: ps,
       maint_revenue: maint,
       hw_revenue: hw,
-      // total_revenue is a generated column (sw + ps + maint + hw)
-      weighted_revenue: totalRevenue * probability,
+      net_booking: netBooking,
+      weighted_revenue: netBooking * probability,
       probability: probability,
       oracle_agreement: oracleNum ? String(oracleNum) : null,
       source_sheet: 'Rats and Mice Only',
+      booking_source: bookingSource,
       fiscal_year: 2026
     })
   }
@@ -167,19 +203,35 @@ async function syncPipelineData() {
     if (seenKeys.has(key)) continue
     seenKeys.add(key)
 
-    const sw = parseCurrency(row[8])
-    const ps = parseCurrency(row[9])
-    const maint = parseCurrency(row[10])
-    const hw = parseCurrency(row[11])
-    const totalRevenue = sw + ps + maint + hw
+    // BOOKING VALUE HIERARCHY:
+    // 1. Primary: Total Net Booking (column 24) - after COGS/margin
+    // 2. Fallback: Bookings ACV (column 17) - if Net Booking is empty
+    // Values are in $M, multiply by 1,000,000 to convert to dollars
+    const netBookingRaw = parseCurrency(row[24])
+    const bookingsAcvRaw = parseCurrency(row[17])
+
+    let netBooking = netBookingRaw * 1000000
+    let bookingSource = 'Net Booking'
+
+    // Fallback to Bookings ACV if Net Booking is zero/empty
+    if (netBooking === 0 && bookingsAcvRaw !== 0) {
+      netBooking = bookingsAcvRaw * 1000000
+      bookingSource = 'Bookings ACV'
+    }
 
     // Allow negative values (reversals) but skip zero
-    if (totalRevenue === 0) continue
+    if (netBooking === 0) continue
 
     const category = normaliseForecast(fcast)
 
     // Use section-based probability (Green=90%, Yellow=50%, Red=20%)
     const probability = SECTION_PROBABILITY[currentSection] || 0.3
+
+    // Also capture individual revenue components for breakdown (columns 8-11)
+    const sw = parseCurrency(row[8])
+    const ps = parseCurrency(row[9])
+    const maint = parseCurrency(row[10])
+    const hw = parseCurrency(row[11])
 
     pipelineRecords.push({
       deal_name: name,
@@ -190,18 +242,19 @@ async function syncPipelineData() {
       ps_revenue: ps,
       maint_revenue: maint,
       hw_revenue: hw,
-      // total_revenue is a generated column (sw + ps + maint + hw)
-      weighted_revenue: totalRevenue * probability,
+      net_booking: netBooking,
+      weighted_revenue: netBooking * probability,
       probability: probability,
       oracle_agreement: oracleNum ? String(oracleNum) : null,
       source_sheet: 'Dial 2 Risk Profile Summary',
+      booking_source: bookingSource,
       fiscal_year: 2026
     })
     dial2Count++
   }
 
   console.log(`   Found ${dial2Count} Dial 2 items`)
-  console.log(`   Total pipeline items: ${pipelineRecords.length}`)
+  console.log(`   Total booking items: ${pipelineRecords.length}`)
 
   // Count by forecast category
   const categoryCount = pipelineRecords.reduce((acc, r) => {
@@ -210,13 +263,19 @@ async function syncPipelineData() {
   }, {})
   console.log('   By Category:', categoryCount)
 
-  // Calculate totals (sum individual revenue fields since total_revenue is a generated column)
-  const totalPipeline = pipelineRecords.reduce((sum, r) =>
-    sum + r.sw_revenue + r.ps_revenue + r.maint_revenue + r.hw_revenue, 0)
-  const weightedPipeline = pipelineRecords.reduce((sum, r) => sum + r.weighted_revenue, 0)
+  // Count by booking source (methodology transparency)
+  const sourceCount = pipelineRecords.reduce((acc, r) => {
+    acc[r.booking_source] = (acc[r.booking_source] || 0) + 1
+    return acc
+  }, {})
+  console.log('   By Booking Source:', sourceCount)
 
-  console.log(`   Total Pipeline Value: $${totalPipeline.toLocaleString()}`)
-  console.log(`   Weighted Pipeline Value: $${weightedPipeline.toLocaleString()}`)
+  // Calculate totals using Net Booking
+  const totalNetBooking = pipelineRecords.reduce((sum, r) => sum + r.net_booking, 0)
+  const weightedNetBooking = pipelineRecords.reduce((sum, r) => sum + r.weighted_revenue, 0)
+
+  console.log(`   Total Net Booking: $${totalNetBooking.toLocaleString()}`)
+  console.log(`   Weighted Net Booking: $${weightedNetBooking.toLocaleString()}`)
 
   // Insert into database
   if (pipelineRecords.length > 0) {
@@ -231,10 +290,10 @@ async function syncPipelineData() {
       if (error) console.log(`   ⚠️ Batch insert error: ${error.message}`)
     }
 
-    console.log(`   ✅ ${pipelineRecords.length} pipeline records synced`)
+    console.log(`   ✅ ${pipelineRecords.length} booking records synced`)
   }
 
-  return { totalPipeline, weightedPipeline, count: pipelineRecords.length }
+  return { totalNetBooking, weightedNetBooking, count: pipelineRecords.length }
 }
 
 async function syncAttritionData() {
@@ -302,10 +361,10 @@ async function syncAttritionData() {
   return { revenueAtRisk: revenueAtRisk2026, totalAtRisk: totalAtRiskAllYears, count: attritionRecords.length }
 }
 
-async function updateExecutiveSummary(pipeline, attrition) {
+async function updateExecutiveSummary(bookings, attrition) {
   console.log('\n📈 Updating Executive Summary...')
 
-  // Update burc_annual_financials with pipeline and attrition totals
+  // Update burc_annual_financials with booking and attrition totals
   const { error } = await supabase
     .from('burc_annual_financials')
     .update({
@@ -321,10 +380,10 @@ async function updateExecutiveSummary(pipeline, attrition) {
 
   // Log the final values that will appear on dashboard
   console.log('\n📋 Dashboard Values:')
-  console.log(`   Total Pipeline: $${pipeline.totalPipeline.toLocaleString()}`)
-  console.log(`   Weighted Pipeline: $${pipeline.weightedPipeline.toLocaleString()}`)
+  console.log(`   Total Net Booking: $${bookings.totalNetBooking.toLocaleString()}`)
+  console.log(`   Weighted Net Booking: $${bookings.weightedNetBooking.toLocaleString()}`)
   console.log(`   Revenue at Risk (2026): $${attrition.revenueAtRisk.toLocaleString()}`)
-  console.log(`   Net Revenue Impact: $${(pipeline.weightedPipeline - attrition.revenueAtRisk).toLocaleString()}`)
+  console.log(`   Net Impact: $${(bookings.weightedNetBooking - attrition.revenueAtRisk).toLocaleString()}`)
 }
 
 // Helper: Extract client name from opportunity name
