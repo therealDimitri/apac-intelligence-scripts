@@ -16,12 +16,17 @@
  * 2. Fallback: "Bookings ACV" (column 17) - Annual Contract Value (if Net Booking is empty)
  * Note: Values in Excel are in $M (millions), converted to dollars by × 1,000,000
  *
- * PROBABILITY WEIGHTING (by section colour in Dial 2 sheet):
+ * PROBABILITY WEIGHTING (by section COLOUR in Dial 2 sheet):
  * - GREEN section:    90% probability (high likelihood to close)
+ *                     Contains: Best Case AND Business Case items
  * - YELLOW section:   50% probability (mid-range likelihood)
+ *                     Contains: Best Case AND Business Case items
  * - RED section:      20% probability (unlikely to close)
- * - Business Case:    50% probability
- * - Pipeline:         30% probability
+ *                     Contains: Best Case AND Business Case items
+ * - PIPELINE section: 30% probability (not Best Case or Business Case)
+ *
+ * Note: Forecast category (Best Case/Business Case) is tracked separately
+ *       from section colour. The colour determines probability, not the category.
  *
  * CALCULATIONS:
  * - Total Net Booking = Sum of all booking values
@@ -52,16 +57,14 @@ const supabase = createClient(supabaseUrl, supabaseKey)
 
 const BURC_FILE = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Leadership Team - General/Performance/Financials/BURC/2026/2026 APAC Performance.xlsx'
 
-// Probability weights by section COLOR (for Dial 2 items)
-// Green = High probability to close
-// Yellow = Mid-range probability
-// Red = Unlikely to close
+// Probability weights by section COLOUR (for Dial 2 items)
+// Colours indicate probability, NOT forecast category
+// Each colour section can contain Best Case AND Business Case items
 const SECTION_PROBABILITY = {
-  'GREEN': 0.9,      // High probability
-  'YELLOW': 0.5,     // Mid-range
-  'RED': 0.2,        // Unlikely
-  'BUSINESS_CASE': 0.5,
-  'PIPELINE': 0.3
+  'GREEN': 0.9,      // High probability - contains Best Case & Business Case
+  'YELLOW': 0.5,     // Mid-range - contains Best Case & Business Case
+  'RED': 0.2,        // Unlikely - contains Best Case & Business Case
+  'PIPELINE': 0.3    // Pure pipeline items (not Best Case or Business Case)
 }
 
 // Category-based probability for Rats & Mice items (no color sections)
@@ -177,11 +180,14 @@ async function syncPipelineData() {
 
     const name = String(row[0]).trim()
 
-    // Track section changes based on header rows (determines probability weighting)
+    // Track section changes based on COLOUR headers (determines probability weighting)
+    // Note: Green/Yellow/Red sections contain BOTH Best Case and Business Case items
+    // The colour determines probability, the forecast category is tracked separately
     if (name.includes('Green:')) { currentSection = 'GREEN'; continue }
     if (name.includes('Yellow:')) { currentSection = 'YELLOW'; continue }
     if (name.includes('Red:')) { currentSection = 'RED'; continue }
-    if (name.includes('Business Case Related')) { currentSection = 'BUSINESS_CASE'; continue }
+    // "Business Case Related" is NOT a separate section - items stay in their colour section
+    // Only Pipeline is a separate section with its own probability
     if (name.includes('Pipeline - NOT')) { currentSection = 'PIPELINE'; continue }
     if (name.includes('Closed in 2026') || name.includes('Lost or missed')) { currentSection = 'EXCLUDE'; continue }
 
@@ -269,6 +275,17 @@ async function syncPipelineData() {
     return acc
   }, {})
   console.log('   By Booking Source:', sourceCount)
+
+  // Count by probability (shows colour section distribution for Dial 2 items)
+  const probCount = pipelineRecords.reduce((acc, r) => {
+    const label = r.probability === 0.9 ? 'GREEN (90%)' :
+                  r.probability === 0.5 ? 'YELLOW (50%)' :
+                  r.probability === 0.3 ? 'PIPELINE (30%)' :
+                  r.probability === 0.2 ? 'RED (20%)' : `OTHER (${r.probability * 100}%)`
+    acc[label] = (acc[label] || 0) + 1
+    return acc
+  }, {})
+  console.log('   By Section Colour:', probCount)
 
   // Calculate totals using Net Booking
   const totalNetBooking = pipelineRecords.reduce((sum, r) => sum + r.net_booking, 0)
