@@ -30,16 +30,13 @@ const supabase = createClient(
 )
 
 // Configuration
-// Primary: Budget Planning file (has full forecast with pre-calculated CSI ratios)
-const BUDGET_PLANNING_SOURCE = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Leadership Team - Performance/Financials/BURC/2026/Budget Planning/2026 APAC Performance.xlsx'
-// Secondary: General folder (may have different data)
-const GENERAL_SOURCE = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Leadership Team - General/Performance/Financials/BURC/2026/2026 APAC Performance.xlsx'
+// Source of truth for 2024 actuals, 2025 actuals, and 2026 forecasts
+// SharePoint: https://alteradh.sharepoint.com/teams/APACLeadershipTeam/Shared Documents/General/Performance/Financials/BURC/2026/2026 APAC Performance.xls
+const PRIMARY_SOURCE = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Leadership Team - General/Performance/Financials/BURC/2026/2026 APAC Performance.xlsx'
 // Fallback: Manual extraction path
 const FALLBACK_SOURCE = '/tmp/burc-source/BURC/2026/2026 APAC Performance.xlsx'
-// Use Budget Planning file first (has forecast CSI ratios), then General, then fallback
-const SOURCE_FILE = fs.existsSync(BUDGET_PLANNING_SOURCE) ? BUDGET_PLANNING_SOURCE
-  : fs.existsSync(GENERAL_SOURCE) ? GENERAL_SOURCE
-  : FALLBACK_SOURCE
+// Use primary source, then fallback
+const SOURCE_FILE = fs.existsSync(PRIMARY_SOURCE) ? PRIMARY_SOURCE : FALLBACK_SOURCE
 
 const args = process.argv.slice(2)
 const DRY_RUN = args.includes('--dry-run')
