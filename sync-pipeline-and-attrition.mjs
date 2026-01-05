@@ -145,6 +145,12 @@ async function syncPipelineData() {
     const maint = parseCurrency(row[10])
     const hw = parseCurrency(row[11])
 
+    // R&M items use category-based sections (no color in Excel)
+    // Map category to section: best case -> green, business case -> yellow, pipeline -> pipeline
+    const sectionColor = category === 'Best Case' ? 'green' :
+                         category === 'Business Case' ? 'yellow' : 'pipeline'
+    const inForecast = ['green', 'yellow'].includes(sectionColor)
+
     pipelineRecords.push({
       deal_name: name,
       client_name: extractClientName(name),
@@ -160,7 +166,11 @@ async function syncPipelineData() {
       oracle_agreement: oracleNum ? String(oracleNum) : null,
       source_sheet: 'Rats and Mice Only',
       booking_source: bookingSource,
-      fiscal_year: 2026
+      fiscal_year: 2026,
+      // BURC Section fields
+      section_color: sectionColor,
+      in_forecast: inForecast,
+      pipeline_status: 'active'
     })
   }
 
@@ -239,6 +249,16 @@ async function syncPipelineData() {
     const maint = parseCurrency(row[10])
     const hw = parseCurrency(row[11])
 
+    // Map BURC section to section_color for database
+    const sectionColorMap = {
+      'GREEN': 'green',
+      'YELLOW': 'yellow',
+      'RED': 'red',
+      'PIPELINE': 'pipeline'
+    }
+    const sectionColor = sectionColorMap[currentSection] || 'pipeline'
+    const inForecast = ['green', 'yellow'].includes(sectionColor)
+
     pipelineRecords.push({
       deal_name: name,
       client_name: extractClientName(name),
@@ -254,7 +274,11 @@ async function syncPipelineData() {
       oracle_agreement: oracleNum ? String(oracleNum) : null,
       source_sheet: 'Dial 2 Risk Profile Summary',
       booking_source: bookingSource,
-      fiscal_year: 2026
+      fiscal_year: 2026,
+      // BURC Section fields - parsed from Excel colour sections
+      section_color: sectionColor,
+      in_forecast: inForecast,
+      pipeline_status: 'active'
     })
     dial2Count++
   }
@@ -276,16 +300,21 @@ async function syncPipelineData() {
   }, {})
   console.log('   By Booking Source:', sourceCount)
 
-  // Count by probability (shows colour section distribution for Dial 2 items)
-  const probCount = pipelineRecords.reduce((acc, r) => {
-    const label = r.probability === 0.9 ? 'GREEN (90%)' :
-                  r.probability === 0.5 ? 'YELLOW (50%)' :
-                  r.probability === 0.3 ? 'PIPELINE (30%)' :
-                  r.probability === 0.2 ? 'RED (20%)' : `OTHER (${r.probability * 100}%)`
+  // Count by section_color (directly from Excel sections)
+  const sectionCount = pipelineRecords.reduce((acc, r) => {
+    const label = r.section_color.charAt(0).toUpperCase() + r.section_color.slice(1)
     acc[label] = (acc[label] || 0) + 1
     return acc
   }, {})
-  console.log('   By Section Colour:', probCount)
+  console.log('   By Section Colour:', sectionCount)
+
+  // Count by in_forecast
+  const forecastCount = pipelineRecords.reduce((acc, r) => {
+    const label = r.in_forecast ? 'In Forecast' : 'Not in Forecast'
+    acc[label] = (acc[label] || 0) + 1
+    return acc
+  }, {})
+  console.log('   By Forecast Status:', forecastCount)
 
   // Calculate totals using Net Booking
   const totalNetBooking = pipelineRecords.reduce((sum, r) => sum + r.net_booking, 0)
