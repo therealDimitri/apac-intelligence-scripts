@@ -146,15 +146,10 @@ async function createTables() {
       // DoH Victoria
       ['Department of Health - Victoria', 'medsuite'],
       ['Department of Health - Victoria', 'analytics'],
-      // Northern Health
-      ['Northern Health', 'medsuite'],
-      ['Northern Health', 'patient-portal'],
-      // Austin Health
-      ['Austin Health', 'medsuite'],
-      ['Austin Health', 'labconnect'],
-      ['Austin Health', 'analytics'],
-      // Mercy
-      ['Mercy Aged Care', 'medsuite'],
+      // NCS/MinDef (Singapore)
+      ['NCS/MinDef', 'sunrise'],
+      // Mount Alvernia Hospital (Singapore)
+      ['Mount Alvernia Hospital', 'sunrise'],
     ]
 
     let inserted = 0

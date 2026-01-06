@@ -34,11 +34,10 @@ const supabase = createClient(supabaseUrl, supabaseKey)
 // Known actual client names - used to determine if client_name is a real client
 const KNOWN_CLIENTS = [
   'SingHealth', 'Singhealth', 'Epworth', 'Barwon', 'WA Health', 'SA Health',
-  'Grampians', 'Western Health', 'Albury Wodonga', 'RVEEH', 'Te Whatu Ora',
+  'Grampians', 'Western Health', 'Albury Wodonga', 'AWH', 'RVEEH', 'Te Whatu Ora',
   'Waikato', 'NCS', 'MinDef', 'Ministry of Defence', 'GHA', 'Gippsland',
-  'SLMC', 'St Luke', 'GRMC', 'Guam', 'Mount Alvernia', 'Department of Health',
-  'DoH Victoria', 'Austin Health', 'Mater Health', 'NCIG', 'MAH', 'Internal',
-  'Austin', 'Mater', 'LRH', 'St John of God'
+  'SLMC', 'St Luke', 'GRMC', 'Guam', 'Mount Alvernia', 'MAH', 'Department of Health',
+  'DoH Victoria', 'Mater Health', 'NCIG', 'Internal', 'Mater', 'LRH', 'St John of God'
 ]
 
 // Patterns that indicate the client_name field contains a subject, not a client

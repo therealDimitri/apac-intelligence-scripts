@@ -78,9 +78,7 @@ const CLIENT_PRODUCTS = {
   'Mount Alvernia Hospital': ['medsuite', 'patient-portal'],
   'Albury Wodonga Health': ['medsuite'],
   'Department of Health - Victoria': ['medsuite', 'analytics'],
-  'Northern Health': ['medsuite', 'patient-portal'],
-  'Austin Health': ['medsuite', 'labconnect', 'analytics'],
-  'Mercy Aged Care': ['medsuite'],
+  'NCS/MinDef': ['sunrise'],
 }
 
 async function createTable() {

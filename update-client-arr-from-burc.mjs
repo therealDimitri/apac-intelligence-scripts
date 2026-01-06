@@ -21,9 +21,9 @@ const CLIENT_MAPPING = {
   'Western Health': 'Western Health',
   'Royal Victorian Eye & Ear': 'The Royal Victorian Eye and Ear Hospital',
   'GHA Regional': 'Gippsland Health Alliance',
-  'Northern Health': null, // Not in current client_arr
-  'Austin Health': null,   // Not in current client_arr
-  'Mercy Aged Care': null, // Not in current client_arr
+  'NCS/MinDef': null,              // Singapore - Not in current client_arr
+  'Albury Wodonga Health': null,   // Not in current client_arr
+  'Mount Alvernia Hospital': null, // Singapore - Not in current client_arr
   'Bus Case': null,        // Not a real client
   'Parkway (Churned)': null, // Churned client
 }

@@ -354,13 +354,13 @@ async function syncClientMaintenance(client, workbook) {
 
   // Client name mapping
   const clientNames = {
-    'AWH': 'Austin Health',
+    'AWH': 'Albury Wodonga Health',
     'BWH': 'Barwon Health',
     'EPH': 'Epworth Healthcare',
     'GHA': 'Grampians Health Alliance',
     'GHRA': 'GHA Regional',
-    'MAH': 'Mercy Aged Care',
-    'NCS': 'Northern Health',
+    'MAH': 'Mount Alvernia Hospital',
+    'NCS': 'NCS/MinDef',
     'RVEEH': 'Royal Victorian Eye & Ear',
     'SA Health': 'SA Health',
     'WA Health': 'WA Health',

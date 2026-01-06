@@ -82,15 +82,10 @@ const CLIENT_PRODUCTS = [
   // DoH Victoria
   { client_name: 'Department of Health - Victoria', product_code: 'medsuite' },
   { client_name: 'Department of Health - Victoria', product_code: 'analytics' },
-  // Northern Health
-  { client_name: 'Northern Health', product_code: 'medsuite' },
-  { client_name: 'Northern Health', product_code: 'patient-portal' },
-  // Austin Health
-  { client_name: 'Austin Health', product_code: 'medsuite' },
-  { client_name: 'Austin Health', product_code: 'labconnect' },
-  { client_name: 'Austin Health', product_code: 'analytics' },
-  // Mercy
-  { client_name: 'Mercy Aged Care', product_code: 'medsuite' },
+  // NCS/MinDef (Singapore)
+  { client_name: 'NCS/MinDef', product_code: 'sunrise' },
+  // Mount Alvernia Hospital (Singapore)
+  { client_name: 'Mount Alvernia Hospital', product_code: 'sunrise' },
 ]
 
 async function applyMigration() {

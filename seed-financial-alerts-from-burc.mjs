@@ -179,7 +179,7 @@ async function seedFinancialData() {
 
     // 2. CONTRACT RENEWALS with CPI opportunities
     // NOTE: Data verified from "Opal Maint Contracts and Value" sheet in 2026 APAC Performance.xlsx on 2025-12-28
-    // Northern Health removed - not found in BURC file (was mock data)
+    // NOTE: "Northern Health" was incorrect - NCS code maps to NCS/MinDef (Singapore), not Northern Health
     console.log('\n📋 Processing Contract Renewals...');
     const renewals = [
       { client: 'Epworth Healthcare', solution: 'Opal', renewalDate: '2025-11-15', annualValue: 234231, notes: 'EPH Opal Contract Renewal - Best Case in Dial 2' },
