@@ -48,9 +48,14 @@ async function syncBurcData() {
     console.log('');
 
     // Sync all data - ORDER MATTERS: Annual Financials first as it's the source of truth
+    // All 2026 data comes from APAC BURC sheet (except FY2025 which comes from comparison sheet)
     await syncAnnualFinancials(workbook);  // FY2025/2026 gross revenue
     await syncCSIRatios(workbook);         // CSI ratios from APAC BURC
-    await syncEbitaData(workbook);
+    await syncEbitaData(workbook);         // EBITA from APAC BURC Row 100-101
+    await syncOpexData(workbook);          // OPEX from APAC BURC Rows 71-98
+    await syncCogsData(workbook);          // COGS from APAC BURC Rows 38-56
+    await syncNetRevenueData(workbook);    // Net Revenue from APAC BURC Rows 58-66
+    await syncGrossRevenueMonthly(workbook); // Monthly Gross Revenue from APAC BURC
     await syncQuarterlyComparison(workbook);
     await syncWaterfallData(workbook);
     await syncClientMaintenance(workbook);
@@ -247,24 +252,29 @@ async function syncCSIRatios(workbook) {
   }
 }
 
+/**
+ * Sync EBITA data from APAC BURC sheet
+ * Source cells (direct cell references):
+ * - Row 100: EBITA values (Actual and Forecast)
+ * - Row 101: EBITA as % of Net Revenue
+ * Columns: C=Jan, D=Feb, E=Mar, F=Apr, G=May, H=Jun, I=Jul, J=Aug, K=Sep, L=Oct, M=Nov, N=Dec
+ * Column U = FY2026 Forecast Total, Column W = FY2026 Target/Budget
+ */
 async function syncEbitaData(workbook) {
-  console.log('📈 Extracting EBITA data...');
+  console.log('📈 Extracting EBITA data from APAC BURC...');
 
-  const sheet = workbook.Sheets['APAC BURC - Monthly EBITA'];
+  const sheet = workbook.Sheets['APAC BURC'];
   if (!sheet) {
-    console.log('   ⚠️ Sheet not found: APAC BURC - Monthly EBITA');
+    console.log('   ⚠️ Sheet not found: APAC BURC');
     return;
   }
 
-  const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+  // Column mapping: C=Jan(1), D=Feb(2), ..., N=Dec(12)
+  const monthCols = ['C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'];
 
-  // Find the rows we need
-  let baselineRow, actualRow, ebitaPercentRow;
-  data.forEach((row, i) => {
-    if (row[0] === 'Baseline (Budget)') baselineRow = i;
-    if (row[0] === 'Actual' && i < 5) actualRow = i;
-    if (row[0] === 'Actual' && i > 5) ebitaPercentRow = i;
-  });
+  // Get annual target from cell W100 (Budget/Target)
+  const annualTarget = sheet['W100']?.v;
+  const monthlyTarget = annualTarget ? annualTarget / 12 : null;
 
   // Delete existing 2026 data
   await supabase.from('burc_ebita_monthly').delete().eq('year', 2026);
@@ -272,19 +282,19 @@ async function syncEbitaData(workbook) {
   const records = [];
   for (let i = 0; i < 12; i++) {
     const month = MONTHS[i];
-    const colIndex = i + 1;
+    const col = monthCols[i];
 
-    const target = data[baselineRow]?.[colIndex] || null;
-    const actual = data[actualRow]?.[colIndex] || null;
-    const ebitaPct = data[ebitaPercentRow]?.[colIndex] || null;
+    // Direct cell references
+    const actual = sheet[col + '100']?.v;      // EBITA value
+    const ebitaPct = sheet[col + '101']?.v;    // EBITA as % of Net Revenue
 
-    if (actual !== null || target !== null) {
-      const variance = (actual && target) ? actual - target : actual;
+    if (actual !== null && actual !== undefined) {
+      const variance = monthlyTarget ? actual - monthlyTarget : actual;
       records.push({
         year: 2026,
         month,
         month_num: i + 1,
-        target_ebita: target,
+        target_ebita: monthlyTarget,
         actual_ebita: actual,
         variance,
         ebita_percent: ebitaPct
@@ -297,48 +307,356 @@ async function syncEbitaData(workbook) {
     if (error) console.error('   ❌ EBITA insert error:', error.message);
   }
 
+  // Show sample values
+  if (records.length > 0) {
+    const sample = records[0];
+    console.log(`   Jan 2026: EBITA=$${(sample.actual_ebita / 1000).toFixed(0)}K (${((sample.ebita_percent || 0) * 100).toFixed(1)}% margin)`);
+  }
   console.log(`   ✅ ${records.length} months of EBITA data synced`);
 }
 
-async function syncQuarterlyComparison(workbook) {
-  console.log('📊 Extracting quarterly comparison...');
+/**
+ * Sync OPEX data from APAC BURC sheet
+ * Source rows:
+ * - Row 71: CS (Customer Service) OPEX
+ * - Row 76: R&D OPEX
+ * - Row 82: PS (Professional Services) OPEX
+ * - Row 88: Sales & Marketing OPEX
+ * - Row 95: G&A (General & Administrative) OPEX
+ * - Row 98: Total OPEX
+ * Columns: C=Jan, D=Feb, E=Mar, ..., N=Dec
+ */
+async function syncOpexData(workbook) {
+  console.log('💼 Extracting OPEX data from APAC BURC...');
 
-  const sheet = workbook.Sheets['26 vs 25 Q Comparison'];
+  const sheet = workbook.Sheets['APAC BURC'];
   if (!sheet) {
-    console.log('   ⚠️ Sheet not found: 26 vs 25 Q Comparison');
+    console.log('   ⚠️ Sheet not found: APAC BURC');
     return;
   }
 
-  const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+  // Column mapping: C=Jan(1), D=Feb(2), ..., N=Dec(12)
+  const monthCols = ['C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'];
 
-  const streams = {
-    'License Revenue': 'license',
-    'Professional Services Revenue': 'professional_services',
-    'Total Maintenance Revenue': 'maintenance',
-    'Hardware Revenue': 'hardware',
-    'Business Case Revenue': 'business_case',
-    'Gross Revenue': 'gross_revenue'
+  // OPEX category row mappings
+  const opexConfig = {
+    cs_opex: 71,        // Customer Service
+    rd_opex: 76,        // R&D
+    ps_opex: 82,        // Professional Services
+    sales_opex: 88,     // Sales & Marketing
+    ga_opex: 95,        // General & Administrative
+    total_opex: 98,     // Total OPEX
   };
+
+  // Delete existing 2026 OPEX data
+  const { error: delError } = await supabase.from('burc_opex_monthly').delete().eq('year', 2026);
+  if (delError && !delError.message.includes('does not exist')) {
+    console.log('   ⚠️ Delete error:', delError.message);
+  }
+
+  const records = [];
+  for (let monthNum = 1; monthNum <= 12; monthNum++) {
+    const col = monthCols[monthNum - 1];
+
+    // Get OPEX values from direct cell references
+    const cs = sheet[col + '71']?.v;
+    const rd = sheet[col + '76']?.v;
+    const ps = sheet[col + '82']?.v;
+    const sales = sheet[col + '88']?.v;
+    const ga = sheet[col + '95']?.v;
+    const total = sheet[col + '98']?.v;
+
+    records.push({
+      year: 2026,
+      month: MONTHS[monthNum - 1],
+      month_num: monthNum,
+      cs_opex: cs ?? null,
+      rd_opex: rd ?? null,
+      ps_opex: ps ?? null,
+      sales_opex: sales ?? null,
+      ga_opex: ga ?? null,
+      total_opex: total ?? null,
+      calculated_at: new Date().toISOString()
+    });
+  }
+
+  // Insert new records (check if table exists first)
+  const { error: insertError } = await supabase.from('burc_opex_monthly').insert(records);
+  if (insertError) {
+    if (insertError.message.includes('does not exist')) {
+      console.log('   ℹ️ Table burc_opex_monthly does not exist - skipping');
+    } else {
+      console.error('   ❌ OPEX insert error:', insertError.message);
+    }
+  } else {
+    const sample = records[0];
+    console.log(`   Jan 2026: Total OPEX=$${((sample.total_opex || 0) / 1000).toFixed(0)}K`);
+    console.log(`   ✅ 12 months of OPEX data synced`);
+  }
+}
+
+/**
+ * Sync COGS data from APAC BURC sheet
+ * Source rows:
+ * - Row 38: License COGS
+ * - Row 40: PS COGS
+ * - Row 44: Maintenance COGS
+ * - Row 47: Hardware COGS
+ * - Row 56: Total COGS
+ * Columns: C=Jan, D=Feb, E=Mar, ..., N=Dec
+ */
+async function syncCogsData(workbook) {
+  console.log('📦 Extracting COGS data from APAC BURC...');
+
+  const sheet = workbook.Sheets['APAC BURC'];
+  if (!sheet) {
+    console.log('   ⚠️ Sheet not found: APAC BURC');
+    return;
+  }
+
+  // Column mapping: C=Jan(1), D=Feb(2), ..., N=Dec(12)
+  const monthCols = ['C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'];
+
+  // Delete existing 2026 COGS data
+  const { error: delError } = await supabase.from('burc_cogs_monthly').delete().eq('year', 2026);
+  if (delError && !delError.message.includes('does not exist')) {
+    console.log('   ⚠️ Delete error:', delError.message);
+  }
+
+  const records = [];
+  for (let monthNum = 1; monthNum <= 12; monthNum++) {
+    const col = monthCols[monthNum - 1];
+
+    // Get COGS values from direct cell references
+    const license = sheet[col + '38']?.v;
+    const ps = sheet[col + '40']?.v;
+    const maintenance = sheet[col + '44']?.v;
+    const hardware = sheet[col + '47']?.v;
+    const total = sheet[col + '56']?.v;
+
+    records.push({
+      year: 2026,
+      month: MONTHS[monthNum - 1],
+      month_num: monthNum,
+      license_cogs: license ?? null,
+      ps_cogs: ps ?? null,
+      maintenance_cogs: maintenance ?? null,
+      hardware_cogs: hardware ?? null,
+      total_cogs: total ?? null,
+      calculated_at: new Date().toISOString()
+    });
+  }
+
+  // Insert new records
+  const { error: insertError } = await supabase.from('burc_cogs_monthly').insert(records);
+  if (insertError) {
+    if (insertError.message.includes('does not exist')) {
+      console.log('   ℹ️ Table burc_cogs_monthly does not exist - skipping');
+    } else {
+      console.error('   ❌ COGS insert error:', insertError.message);
+    }
+  } else {
+    const sample = records[0];
+    console.log(`   Jan 2026: Total COGS=$${((sample.total_cogs || 0) / 1000).toFixed(0)}K`);
+    console.log(`   ✅ 12 months of COGS data synced`);
+  }
+}
+
+/**
+ * Sync Net Revenue data from APAC BURC sheet
+ * Net Revenue = Gross Revenue - COGS
+ * Source rows (estimated):
+ * - Row 58-66: Net Revenue by type
+ * Columns: C=Jan, D=Feb, E=Mar, ..., N=Dec
+ */
+async function syncNetRevenueData(workbook) {
+  console.log('💵 Extracting Net Revenue data from APAC BURC...');
+
+  const sheet = workbook.Sheets['APAC BURC'];
+  if (!sheet) {
+    console.log('   ⚠️ Sheet not found: APAC BURC');
+    return;
+  }
+
+  // Column mapping: C=Jan(1), D=Feb(2), ..., N=Dec(12)
+  const monthCols = ['C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'];
+
+  // Delete existing 2026 Net Revenue data
+  const { error: delError } = await supabase.from('burc_net_revenue_monthly').delete().eq('year', 2026);
+  if (delError && !delError.message.includes('does not exist')) {
+    console.log('   ⚠️ Delete error:', delError.message);
+  }
+
+  const records = [];
+  for (let monthNum = 1; monthNum <= 12; monthNum++) {
+    const col = monthCols[monthNum - 1];
+
+    // Get Net Revenue values (Total Net Revenue at row 66)
+    const license = sheet[col + '58']?.v;
+    const ps = sheet[col + '60']?.v;
+    const maintenance = sheet[col + '63']?.v;
+    const hardware = sheet[col + '65']?.v;
+    const total = sheet[col + '66']?.v;
+
+    records.push({
+      year: 2026,
+      month: MONTHS[monthNum - 1],
+      month_num: monthNum,
+      license_net: license ?? null,
+      ps_net: ps ?? null,
+      maintenance_net: maintenance ?? null,
+      hardware_net: hardware ?? null,
+      total_net_revenue: total ?? null,
+      calculated_at: new Date().toISOString()
+    });
+  }
+
+  // Insert new records
+  const { error: insertError } = await supabase.from('burc_net_revenue_monthly').insert(records);
+  if (insertError) {
+    if (insertError.message.includes('does not exist')) {
+      console.log('   ℹ️ Table burc_net_revenue_monthly does not exist - skipping');
+    } else {
+      console.error('   ❌ Net Revenue insert error:', insertError.message);
+    }
+  } else {
+    const sample = records[0];
+    console.log(`   Jan 2026: Total Net Revenue=$${((sample.total_net_revenue || 0) / 1000).toFixed(0)}K`);
+    console.log(`   ✅ 12 months of Net Revenue data synced`);
+  }
+}
+
+/**
+ * Sync Monthly Gross Revenue from APAC BURC sheet
+ * Source rows:
+ * - Row 28: License Revenue
+ * - Row 30: PS Revenue
+ * - Row 33: Maintenance Revenue
+ * - Row 35: Hardware Revenue
+ * - Row 36: Total Gross Revenue
+ * Columns: C=Jan, D=Feb, E=Mar, ..., N=Dec
+ */
+async function syncGrossRevenueMonthly(workbook) {
+  console.log('💰 Extracting Monthly Gross Revenue from APAC BURC...');
+
+  const sheet = workbook.Sheets['APAC BURC'];
+  if (!sheet) {
+    console.log('   ⚠️ Sheet not found: APAC BURC');
+    return;
+  }
+
+  // Column mapping: C=Jan(1), D=Feb(2), ..., N=Dec(12)
+  const monthCols = ['C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'];
+
+  // Delete existing 2026 monthly revenue data
+  const { error: delError } = await supabase.from('burc_gross_revenue_monthly').delete().eq('year', 2026);
+  if (delError && !delError.message.includes('does not exist')) {
+    console.log('   ⚠️ Delete error:', delError.message);
+  }
+
+  const records = [];
+  for (let monthNum = 1; monthNum <= 12; monthNum++) {
+    const col = monthCols[monthNum - 1];
+
+    // Get revenue values from direct cell references
+    const license = sheet[col + '28']?.v;
+    const ps = sheet[col + '30']?.v;
+    const maintenance = sheet[col + '33']?.v;
+    const hardware = sheet[col + '35']?.v;
+    const total = sheet[col + '36']?.v;
+
+    records.push({
+      year: 2026,
+      month: MONTHS[monthNum - 1],
+      month_num: monthNum,
+      license_revenue: license ?? null,
+      ps_revenue: ps ?? null,
+      maintenance_revenue: maintenance ?? null,
+      hardware_revenue: hardware ?? null,
+      total_gross_revenue: total ?? null,
+      calculated_at: new Date().toISOString()
+    });
+  }
+
+  // Insert new records
+  const { error: insertError } = await supabase.from('burc_gross_revenue_monthly').insert(records);
+  if (insertError) {
+    if (insertError.message.includes('does not exist')) {
+      console.log('   ℹ️ Table burc_gross_revenue_monthly does not exist - skipping');
+    } else {
+      console.error('   ❌ Gross Revenue insert error:', insertError.message);
+    }
+  } else {
+    const sample = records[0];
+    console.log(`   Jan 2026: Total Gross Revenue=$${((sample.total_gross_revenue || 0) / 1000).toFixed(0)}K`);
+    console.log(`   ✅ 12 months of Gross Revenue data synced`);
+  }
+}
+
+/**
+ * Sync Quarterly Comparison from APAC BURC sheet for 2026 data
+ * Source rows (using direct cell references):
+ * - Row 28: License Revenue
+ * - Row 30: PS Revenue
+ * - Row 33: Maintenance Revenue
+ * - Row 35: Hardware Revenue
+ * - Row 36: Total Gross Revenue
+ * Columns: C-E=Q1, F-H=Q2, I-K=Q3, L-N=Q4
+ */
+async function syncQuarterlyComparison(workbook) {
+  console.log('📊 Extracting quarterly comparison from APAC BURC...');
+
+  const sheet = workbook.Sheets['APAC BURC'];
+  if (!sheet) {
+    console.log('   ⚠️ Sheet not found: APAC BURC');
+    return;
+  }
+
+  // Helper to sum quarterly values from monthly cells
+  const getQuarterlySum = (row, qCols) => {
+    let sum = 0;
+    for (const col of qCols) {
+      const val = sheet[col + row]?.v;
+      if (typeof val === 'number') sum += val;
+    }
+    return sum;
+  };
+
+  // Quarter column mappings
+  const q1Cols = ['C', 'D', 'E'];  // Jan, Feb, Mar
+  const q2Cols = ['F', 'G', 'H'];  // Apr, May, Jun
+  const q3Cols = ['I', 'J', 'K'];  // Jul, Aug, Sep
+  const q4Cols = ['L', 'M', 'N'];  // Oct, Nov, Dec
+
+  // Revenue stream row mappings
+  const streamMappings = [
+    { row: 28, stream: 'license' },
+    { row: 30, stream: 'professional_services' },
+    { row: 33, stream: 'maintenance' },
+    { row: 35, stream: 'hardware' },
+    { row: 36, stream: 'gross_revenue' },
+  ];
 
   await supabase.from('burc_quarterly').delete().eq('year', 2026);
 
   const records = [];
-  for (const row of data) {
-    const label = row[0];
-    if (streams[label]) {
-      const streamKey = streams[label];
-      const quarters = ['Q1', 'Q2', 'Q3', 'Q4'];
+  const quarters = [
+    { name: 'Q1', cols: q1Cols },
+    { name: 'Q2', cols: q2Cols },
+    { name: 'Q3', cols: q3Cols },
+    { name: 'Q4', cols: q4Cols },
+  ];
 
-      for (let q = 0; q < 4; q++) {
-        const amount = row[3 + q];
-        if (amount !== undefined && amount !== null) {
-          records.push({
-            year: 2026,
-            quarter: quarters[q],
-            revenue_stream: streamKey,
-            amount
-          });
-        }
+  for (const mapping of streamMappings) {
+    for (const quarter of quarters) {
+      const amount = getQuarterlySum(mapping.row, quarter.cols);
+      if (amount !== 0) {
+        records.push({
+          year: 2026,
+          quarter: quarter.name,
+          revenue_stream: mapping.stream,
+          amount
+        });
       }
     }
   }
@@ -547,48 +865,67 @@ async function syncPsPipeline(workbook) {
   console.log(`   ✅ ${records.length} PS pipeline entries synced`);
 }
 
+/**
+ * Sync Revenue Streams from APAC BURC sheet
+ * Source rows (using direct cell references):
+ * - Row 28: License Revenue
+ * - Row 30: PS Revenue
+ * - Row 33: Maintenance Revenue
+ * - Row 35: Hardware Revenue
+ * - Row 36: Total Gross Revenue
+ * Columns: C-E=Q1, F-H=Q2, I-K=Q3, L-N=Q4, U=FY2026 Forecast
+ */
 async function syncRevenueStreams(workbook) {
-  console.log('💰 Extracting revenue streams summary...');
+  console.log('💰 Extracting revenue streams from APAC BURC...');
 
-  const sheet = workbook.Sheets['26 vs 25 Q Comparison'];
+  const sheet = workbook.Sheets['APAC BURC'];
   if (!sheet) {
-    console.log('   ⚠️ Sheet not found: 26 vs 25 Q Comparison');
+    console.log('   ⚠️ Sheet not found: APAC BURC');
     return;
   }
 
-  const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+  // Helper to sum quarterly values from monthly cells
+  const getQuarterlySum = (row, qCols) => {
+    let sum = 0;
+    for (const col of qCols) {
+      const val = sheet[col + row]?.v;
+      if (typeof val === 'number') sum += val;
+    }
+    return sum;
+  };
+
+  // Quarter column mappings
+  const q1Cols = ['C', 'D', 'E'];  // Jan, Feb, Mar
+  const q2Cols = ['F', 'G', 'H'];  // Apr, May, Jun
+  const q3Cols = ['I', 'J', 'K'];  // Jul, Aug, Sep
+  const q4Cols = ['L', 'M', 'N'];  // Oct, Nov, Dec
+
+  // Revenue stream row mappings
+  const streamMappings = [
+    { row: 28, stream: 'License' },
+    { row: 30, stream: 'Professional Services' },
+    { row: 33, stream: 'Maintenance' },
+    { row: 35, stream: 'Hardware' },
+    { row: 36, stream: 'Gross Revenue' },
+    { row: 38, stream: 'License COGS' },
+  ];
 
   await supabase.from('burc_revenue_streams').delete().neq('stream', '');
 
-  const streamMappings = [
-    { label: 'License Revenue', stream: 'License' },
-    { label: 'Professional Services Revenue', stream: 'Professional Services' },
-    { label: 'Total Maintenance Revenue', stream: 'Maintenance' },
-    { label: 'Hardware Revenue', stream: 'Hardware' },
-    { label: 'Business Case Revenue', stream: 'Business Case' },
-    { label: 'Gross Revenue', stream: 'Gross Revenue' },
-    { label: 'License COGS', stream: 'License COGS' },
-  ];
-
   const records = [];
-  for (const row of data) {
-    const label = row[0];
-    const mapping = streamMappings.find(m => m.label === label);
+  for (const mapping of streamMappings) {
+    const q1 = getQuarterlySum(mapping.row, q1Cols);
+    const q2 = getQuarterlySum(mapping.row, q2Cols);
+    const q3 = getQuarterlySum(mapping.row, q3Cols);
+    const q4 = getQuarterlySum(mapping.row, q4Cols);
+    const annual = sheet['U' + mapping.row]?.v || (q1 + q2 + q3 + q4);
 
-    if (mapping) {
-      const q1 = row[3] || 0;
-      const q2 = row[4] || 0;
-      const q3 = row[5] || 0;
-      const q4 = row[6] || 0;
-      const annual = q1 + q2 + q3 + q4;
-
-      records.push({
-        stream: mapping.stream,
-        category: 'forecast',
-        q1, q2, q3, q4,
-        annual_total: annual
-      });
-    }
+    records.push({
+      stream: mapping.stream,
+      category: 'forecast',
+      q1, q2, q3, q4,
+      annual_total: annual
+    });
   }
 
   if (records.length > 0) {
@@ -596,6 +933,11 @@ async function syncRevenueStreams(workbook) {
     if (error) console.error('   ❌ Revenue streams insert error:', error.message);
   }
 
+  // Show sample
+  const grossRev = records.find(r => r.stream === 'Gross Revenue');
+  if (grossRev) {
+    console.log(`   FY2026 Gross Revenue: $${(grossRev.annual_total / 1000000).toFixed(3)}M`);
+  }
   console.log(`   ✅ ${records.length} revenue stream entries synced`);
 }
 
