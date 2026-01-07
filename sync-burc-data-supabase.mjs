@@ -43,7 +43,12 @@ async function syncBurcData() {
     // Read BURC file
     const workbook = XLSX.readFile(BURC_PATH);
 
-    // Sync all data
+    // List all worksheets being synced
+    console.log('📋 Worksheets in file:', workbook.SheetNames.join(', '));
+    console.log('');
+
+    // Sync all data - ORDER MATTERS: Annual Financials first as it's the source of truth
+    await syncAnnualFinancials(workbook);  // NEW: Syncs FY2025/2026 gross revenue from APAC BURC sheet
     await syncEbitaData(workbook);
     await syncQuarterlyComparison(workbook);
     await syncWaterfallData(workbook);
@@ -64,6 +69,95 @@ async function syncBurcData() {
   } catch (err) {
     console.error('❌ Error:', err.message);
     process.exit(1);
+  }
+}
+
+/**
+ * Sync Annual Financials from APAC BURC sheet
+ * Row 35: "Gross Revenue (Actual and Forecast) Includes Business Case"
+ * - Column 20 (index): FY2026 Total
+ * - Column 21 (index): FY2025 Total
+ */
+async function syncAnnualFinancials(workbook) {
+  console.log('💵 Extracting Annual Financials from APAC BURC sheet...');
+
+  const sheet = workbook.Sheets['APAC BURC'];
+  if (!sheet) {
+    console.log('   ⚠️ Sheet not found: APAC BURC');
+    return;
+  }
+
+  const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+  // Find Row 35: "Gross Revenue (Actual and Forecast) Includes Business Case"
+  let grossRevenueRow = null;
+  for (let i = 0; i < data.length; i++) {
+    const firstCol = (data[i]?.[0] || '').toString();
+    if (firstCol.includes('Gross Revenue') && firstCol.includes('Actual and Forecast')) {
+      grossRevenueRow = data[i];
+      console.log(`   Found row ${i}: ${firstCol}`);
+      break;
+    }
+  }
+
+  if (!grossRevenueRow) {
+    console.log('   ⚠️ Could not find "Gross Revenue (Actual and Forecast)" row');
+    return;
+  }
+
+  // Extract FY2026 and FY2025 totals
+  // The row contains monthly values followed by annual totals
+  // FY2026 total is around column 20, FY2025 around column 21
+  let fy2026Total = null;
+  let fy2025Total = null;
+
+  // Find the annual totals by looking for values > $25M (annual totals)
+  for (let i = 0; i < grossRevenueRow.length; i++) {
+    const val = grossRevenueRow[i];
+    if (typeof val === 'number' && val > 25000000 && val < 40000000) {
+      if (!fy2026Total) {
+        fy2026Total = val;
+        console.log(`   FY2026 Gross Revenue (col ${i}): $${(val / 1000000).toFixed(3)}M`);
+      } else if (!fy2025Total && val !== fy2026Total) {
+        fy2025Total = val;
+        console.log(`   FY2025 Gross Revenue (col ${i}): $${(val / 1000000).toFixed(3)}M`);
+      }
+    }
+  }
+
+  // Update burc_annual_financials table
+  if (fy2026Total) {
+    const { error: error2026 } = await supabase
+      .from('burc_annual_financials')
+      .update({
+        gross_revenue: fy2026Total,
+        source_file: '2026 APAC Performance.xlsx (APAC BURC sheet)',
+        updated_at: new Date().toISOString()
+      })
+      .eq('fiscal_year', 2026);
+
+    if (error2026) {
+      console.error('   ❌ FY2026 update error:', error2026.message);
+    } else {
+      console.log(`   ✅ FY2026 updated: $${(fy2026Total / 1000000).toFixed(3)}M`);
+    }
+  }
+
+  if (fy2025Total) {
+    const { error: error2025 } = await supabase
+      .from('burc_annual_financials')
+      .update({
+        gross_revenue: fy2025Total,
+        source_file: '2026 APAC Performance.xlsx (APAC BURC sheet)',
+        updated_at: new Date().toISOString()
+      })
+      .eq('fiscal_year', 2025);
+
+    if (error2025) {
+      console.error('   ❌ FY2025 update error:', error2025.message);
+    } else {
+      console.log(`   ✅ FY2025 updated: $${(fy2025Total / 1000000).toFixed(3)}M`);
+    }
   }
 }
 
