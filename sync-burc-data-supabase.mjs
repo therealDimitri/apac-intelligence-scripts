@@ -73,66 +73,50 @@ async function syncBurcData() {
 }
 
 /**
- * Sync Annual Financials from multiple sheets:
- * - FY2026: APAC BURC sheet, Row 35 "Gross Revenue (Actual and Forecast)", Column 20
- * - FY2025: 26 vs 25 Q Comparison sheet, Row 12 "Gross Revenue", Column 15 (25 Total)
+ * Sync Annual Financials from multiple sheets using direct cell references:
+ * - FY2026 Forecast: APAC BURC sheet, Cell U36 ($31.170M)
+ * - FY2026 Target: APAC BURC sheet, Cell W36 ($30.906M)
+ * - FY2025 Actual: 26 vs 25 Q Comparison sheet, Cell P14 ($26.345M)
  */
 async function syncAnnualFinancials(workbook) {
-  console.log('💵 Extracting Annual Financials...');
+  console.log('💵 Extracting Annual Financials (using direct cell references)...');
 
   let fy2026Total = null;
   let fy2025Total = null;
 
-  // === FY2026: From APAC BURC sheet ===
+  // === FY2026: From APAC BURC sheet, Row 36 ===
   const apacSheet = workbook.Sheets['APAC BURC'];
   if (apacSheet) {
-    const apacData = XLSX.utils.sheet_to_json(apacSheet, { header: 1 });
+    // Direct cell references for accuracy
+    const cellU36 = apacSheet['U36']?.v; // FY2026 Forecast
+    const cellW36 = apacSheet['W36']?.v; // FY2026 Target
+    const cellA36 = apacSheet['A36']?.v; // Row label for verification
 
-    // Find Row 35: "Gross Revenue (Actual and Forecast) Includes Business Case"
-    for (let i = 0; i < apacData.length; i++) {
-      const firstCol = (apacData[i]?.[0] || '').toString();
-      if (firstCol.includes('Gross Revenue') && firstCol.includes('Actual and Forecast')) {
-        // FY2026 Total is at column 20
-        fy2026Total = apacData[i][20];
-        console.log(`   FY2026 from APAC BURC (row ${i}, col 20): $${(fy2026Total / 1000000).toFixed(3)}M`);
-        break;
-      }
+    if (cellU36 && typeof cellU36 === 'number') {
+      fy2026Total = cellU36;
+      console.log(`   FY2026 Forecast from APAC BURC (Cell U36): $${(fy2026Total / 1000000).toFixed(3)}M`);
+      console.log(`   FY2026 Target from APAC BURC (Cell W36): $${(cellW36 / 1000000).toFixed(3)}M`);
+      console.log(`   Row label: "${cellA36}"`);
+    } else {
+      console.log('   ⚠️ Could not read FY2026 from APAC BURC cell U36');
     }
   } else {
     console.log('   ⚠️ Sheet not found: APAC BURC');
   }
 
-  // === FY2025: From 26 vs 25 Q Comparison sheet ===
+  // === FY2025: From 26 vs 25 Q Comparison sheet, Row 14 ===
   const compSheet = workbook.Sheets['26 vs 25 Q Comparison'];
   if (compSheet) {
-    const compData = XLSX.utils.sheet_to_json(compSheet, { header: 1 });
+    // Direct cell reference for accuracy
+    const cellP14 = compSheet['P14']?.v; // FY2025 Actual (25 Total)
+    const cellA14 = compSheet['A14']?.v; // Row label for verification
 
-    // Find the header row to locate "25 Total" column
-    let totalCol25 = null;
-    for (let i = 0; i < 10; i++) {
-      const row = compData[i];
-      if (row) {
-        for (let j = 0; j < row.length; j++) {
-          // The column after Q4 25 values contains the 25 Total (around col 14)
-          if (row[j] === '25 Total' || (row[j] === '26 Total' && j === 8)) {
-            // 25 Total is typically 6 columns after 26 Total
-            totalCol25 = 14;
-            break;
-          }
-        }
-      }
-    }
-
-    // Find "Gross Revenue" row and extract FY2025 total
-    for (let i = 0; i < compData.length; i++) {
-      const firstCol = (compData[i]?.[0] || '').toString();
-      if (firstCol === 'Gross Revenue') {
-        // 25 Total is at column 15 based on the structure:
-        // Cols 3-6: Q1-Q4 2026, Col 8: 26 Total, Cols 10-13: Q1-Q4 2025, Col 15: 25 Total
-        fy2025Total = compData[i][15];
-        console.log(`   FY2025 from 26 vs 25 Q Comparison (row ${i}, col 15): $${(fy2025Total / 1000000).toFixed(3)}M`);
-        break;
-      }
+    if (cellP14 && typeof cellP14 === 'number') {
+      fy2025Total = cellP14;
+      console.log(`   FY2025 Actual from 26 vs 25 Q Comparison (Cell P14): $${(fy2025Total / 1000000).toFixed(3)}M`);
+      console.log(`   Row label: "${cellA14}"`);
+    } else {
+      console.log('   ⚠️ Could not read FY2025 from 26 vs 25 Q Comparison cell P14');
     }
   } else {
     console.log('   ⚠️ Sheet not found: 26 vs 25 Q Comparison');
@@ -144,7 +128,7 @@ async function syncAnnualFinancials(workbook) {
       .from('burc_annual_financials')
       .update({
         gross_revenue: fy2026Total,
-        source_file: '2026 APAC Performance.xlsx (APAC BURC sheet, Row 35, Col 20)',
+        source_file: '2026 APAC Performance.xlsx (APAC BURC sheet, Cell U36)',
         updated_at: new Date().toISOString()
       })
       .eq('fiscal_year', 2026);
@@ -161,7 +145,7 @@ async function syncAnnualFinancials(workbook) {
       .from('burc_annual_financials')
       .update({
         gross_revenue: fy2025Total,
-        source_file: '2026 APAC Performance.xlsx (26 vs 25 Q Comparison, Gross Revenue row, Col 15)',
+        source_file: '2026 APAC Performance.xlsx (26 vs 25 Q Comparison, Cell P14)',
         updated_at: new Date().toISOString()
       })
       .eq('fiscal_year', 2025);
