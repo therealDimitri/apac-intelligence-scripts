@@ -48,7 +48,8 @@ async function syncBurcData() {
     console.log('');
 
     // Sync all data - ORDER MATTERS: Annual Financials first as it's the source of truth
-    await syncAnnualFinancials(workbook);  // NEW: Syncs FY2025/2026 gross revenue from APAC BURC sheet
+    await syncAnnualFinancials(workbook);  // FY2025/2026 gross revenue
+    await syncCSIRatios(workbook);         // CSI ratios from APAC BURC
     await syncEbitaData(workbook);
     await syncQuarterlyComparison(workbook);
     await syncWaterfallData(workbook);
@@ -155,6 +156,94 @@ async function syncAnnualFinancials(workbook) {
     } else {
       console.log(`   ✅ FY2025 updated: $${(fy2025Total / 1000000).toFixed(3)}M`);
     }
+  }
+}
+
+/**
+ * Sync CSI Ratios from APAC BURC sheet
+ * Source cells (using direct cell references):
+ * - Row 122: Customer Service (>4) - maps to maintenance_ratio
+ * - Row 123: Sales & Marketing (>1) - maps to sales_ratio
+ * - Row 124: R&D (>1) - maps to rd_ratio
+ * - Row 125: Professional Services (>2) - maps to ps_ratio
+ * - Row 126: Administration <=20% - maps to ga_ratio
+ * - Row 127: Core Profitability Ratio >50% - stored as core_profitability
+ * Columns: C=Jan, D=Feb, E=Mar, F=Apr, G=May, H=Jun, I=Jul, J=Aug, K=Sep, L=Oct, M=Nov, N=Dec
+ */
+async function syncCSIRatios(workbook) {
+  console.log('📊 Extracting CSI Ratios from APAC BURC...');
+
+  const sheet = workbook.Sheets['APAC BURC'];
+  if (!sheet) {
+    console.log('   ⚠️ Sheet not found: APAC BURC');
+    return;
+  }
+
+  // Column mapping: C=Jan(1), D=Feb(2), ..., N=Dec(12)
+  const monthCols = ['C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'];
+
+  // CSI Ratio row mappings (Excel rows)
+  const csiConfig = {
+    maintenance_ratio: 122, // Customer Service (>4)
+    sales_ratio: 123,       // Sales & Marketing (>1)
+    rd_ratio: 124,          // R&D (>1)
+    ps_ratio: 125,          // Professional Services (>2)
+    ga_ratio: 126,          // Administration <=20%
+  };
+
+  // Delete existing 2026 CSI data
+  const { error: delError } = await supabase.from('burc_csi_ratios').delete().eq('year', 2026);
+  if (delError) {
+    console.log('   ⚠️ Delete error:', delError.message);
+  }
+
+  const records = [];
+  for (let monthNum = 1; monthNum <= 12; monthNum++) {
+    const col = monthCols[monthNum - 1];
+
+    // Get CSI values from direct cell references
+    const maintenance = sheet[col + '122']?.v; // Customer Service
+    const sales = sheet[col + '123']?.v;       // Sales & Marketing
+    const rd = sheet[col + '124']?.v;          // R&D
+    const ps = sheet[col + '125']?.v;          // Professional Services
+    const ga = sheet[col + '126']?.v;          // Administration
+
+    // Determine status based on targets
+    // Values are already as ratios (e.g., 4.6 means 460%, 0.25 means 25%)
+    const getStatus = (val, target, isMax = false) => {
+      if (val === undefined || val === null) return 'grey';
+      if (isMax) return val <= target ? 'green' : 'red';
+      return val >= target ? 'green' : 'red';
+    };
+
+    records.push({
+      year: 2026,
+      month_num: monthNum,
+      // Store as multiplier values (e.g., 4.6 for 460%)
+      maintenance_ratio: maintenance ?? null,
+      sales_ratio: sales ?? null,
+      rd_ratio: rd ?? null,
+      ps_ratio: ps ?? null,
+      ga_ratio: ga ?? null,
+      // Status based on targets
+      maintenance_status: getStatus(maintenance, 4),      // >4
+      sales_status: getStatus(sales, 1),                   // >1
+      rd_status: getStatus(rd, 1),                         // >1
+      ps_status: getStatus(ps, 2),                         // >2
+      ga_status: getStatus(ga, 0.20, true),               // <=20%
+      calculated_at: new Date().toISOString()
+    });
+  }
+
+  // Insert new records
+  const { error: insertError } = await supabase.from('burc_csi_ratios').insert(records);
+  if (insertError) {
+    console.error('   ❌ CSI insert error:', insertError.message);
+  } else {
+    // Show sample values
+    const sample = records[0];
+    console.log(`   Jan 2026: Maint=${(sample.maintenance_ratio * 100).toFixed(1)}% PS=${(sample.ps_ratio * 100).toFixed(1)}% Sales=${(sample.sales_ratio * 100).toFixed(1)}% R&D=${(sample.rd_ratio * 100).toFixed(1)}% G&A=${(sample.ga_ratio * 100).toFixed(1)}%`);
+    console.log(`   ✅ 12 months of CSI ratios synced`);
   }
 }
 
