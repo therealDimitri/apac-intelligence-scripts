@@ -247,6 +247,16 @@ function extractAgingCases(workbook) {
 
 /**
  * Extract SLA compliance percentages
+ * Parses the "SLA Compliance" worksheet which has sections like:
+ * - "Monthly Response Time Compliance" with a Grand Total row
+ * - "Resolution Compliance" with a Grand Total row
+ * - "Ongoing Engagement Compliance" with a Grand Total row
+ *
+ * Each section has:
+ *   Row: Section header (e.g., "Monthly Response Time Compliance")
+ *   Row: Column headers (Month | SLA Met | SLA Missed | Grand Total | Compliance %)
+ *   Rows: Monthly data
+ *   Row: Grand Total with compliance percentage in last column
  */
 function extractSLACompliance(workbook) {
   const sheet = findSheet(workbook, 'SLA Compliance', 'Resolution Compliance', 'Response');
@@ -258,37 +268,72 @@ function extractSLACompliance(workbook) {
   let resolution = null;
   let breachCount = 0;
 
-  for (const row of data) {
-    if (!row) continue;
-    const firstCell = String(row[0] || '').toLowerCase();
+  // Track which section we're in
+  let currentSection = null;
 
-    // Look for response/resolution percentages
-    if (firstCell.includes('response') && firstCell.includes('compliance')) {
-      for (let i = 1; i < row.length; i++) {
-        const val = parseFloat(row[i]);
-        if (!isNaN(val) && val <= 100 && val > 0) {
-          response = val;
-          break;
-        }
-      }
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i];
+    if (!row || row.length === 0) continue;
+
+    const firstCell = String(row[0] || '').toLowerCase().trim();
+
+    // Detect section headers
+    if (firstCell.includes('response') && firstCell.includes('time') && firstCell.includes('compliance')) {
+      currentSection = 'response';
+      continue;
     }
-
     if (firstCell.includes('resolution') && firstCell.includes('compliance')) {
-      for (let i = 1; i < row.length; i++) {
-        const val = parseFloat(row[i]);
-        if (!isNaN(val) && val <= 100 && val > 0) {
-          resolution = val;
+      currentSection = 'resolution';
+      continue;
+    }
+    if (firstCell.includes('engagement') && firstCell.includes('compliance')) {
+      currentSection = 'engagement';
+      continue;
+    }
+
+    // Look for "Grand Total" row - this has the overall compliance percentage
+    if (firstCell === 'grand total') {
+      // Find the compliance percentage in this row (usually last non-empty column)
+      let compliancePercent = null;
+
+      for (let j = row.length - 1; j >= 1; j--) {
+        const val = row[j];
+        if (val === null || val === undefined || val === '') continue;
+
+        const numVal = parseFloat(val);
+        if (!isNaN(numVal)) {
+          // Check if it's a decimal (0-1) or percentage (0-100)
+          if (numVal > 0 && numVal <= 1) {
+            compliancePercent = numVal * 100; // Convert decimal to percentage
+          } else if (numVal > 0 && numVal <= 100) {
+            compliancePercent = numVal;
+          }
           break;
         }
       }
-    }
 
-    // Look for breach count
-    if (firstCell.includes('breach')) {
-      for (let i = 1; i < row.length; i++) {
-        const val = parseInt(row[i]);
-        if (!isNaN(val)) {
-          breachCount += val;
+      if (compliancePercent !== null) {
+        if (currentSection === 'response' && response === null) {
+          response = compliancePercent;
+          console.log(`    Found Response SLA: ${compliancePercent.toFixed(1)}%`);
+        } else if (currentSection === 'resolution' && resolution === null) {
+          resolution = compliancePercent;
+          console.log(`    Found Resolution SLA: ${compliancePercent.toFixed(1)}%`);
+        }
+      }
+
+      // Also count breaches from this row if available (usually column for "Missed" or "Breached")
+      for (let j = 1; j < row.length - 1; j++) {
+        const val = parseInt(row[j]);
+        if (!isNaN(val) && val > 0 && val < 1000) {
+          // This could be a breach/missed count - add to total if in resolution section
+          if (currentSection === 'resolution') {
+            const headerRow = data[i - 1] || data[i - 2] || [];
+            const header = String(headerRow[j] || '').toLowerCase();
+            if (header.includes('breach') || header.includes('missed')) {
+              breachCount += val;
+            }
+          }
         }
       }
     }
