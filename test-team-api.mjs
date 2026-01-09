@@ -7,7 +7,7 @@ const supabase = createClient(
 
 // Test data aggregation
 const CSE_NAMES = ['Gilbert So', 'Tracey Bland', 'Laura Messing', 'John Salisbury', 'BoonTeck Lim']
-const CAM_NAMES = ['Nikki Wei', 'Anupama Pradhan']
+const CAM_NAMES = ['Nikki Wei', 'Anu Pradhan']
 
 console.log('=== Team Performance Data Test ===\n')
 
