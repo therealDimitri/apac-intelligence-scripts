@@ -540,7 +540,7 @@ async function main() {
   // Parse arguments
   let syncScope = 'all';
   let fiscalYear = null;
-  let runValidation = true;
+  let shouldRunValidation = true;
   let sendNotify = true;
   let triggeredBy = 'manual';
 
@@ -552,7 +552,7 @@ async function main() {
       fiscalYear = parseInt(args[i + 1]);
       i++;
     } else if (args[i] === '--skip-validation') {
-      runValidation = false;
+      shouldRunValidation = false;
     } else if (args[i] === '--skip-notify') {
       sendNotify = false;
     } else if (args[i] === '--triggered-by' && args[i + 1]) {
@@ -590,7 +590,7 @@ async function main() {
     }
 
     // Run validation if enabled
-    if (runValidation) {
+    if (shouldRunValidation) {
       const validationPassed = await runValidation(syncScope, fiscalYear, tracker);
 
       if (!validationPassed) {

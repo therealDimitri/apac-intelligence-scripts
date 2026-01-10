@@ -32,7 +32,7 @@ const supabase = createClient(
 // Configuration
 // Source of truth for 2024 actuals, 2025 actuals, and 2026 forecasts
 // SharePoint: https://alteradh.sharepoint.com/teams/APACLeadershipTeam/Shared Documents/General/Performance/Financials/BURC/2026/2026 APAC Performance.xls
-const PRIMARY_SOURCE = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Leadership Team - General/Performance/Financials/BURC/2026/2026 APAC Performance.xlsx'
+const PRIMARY_SOURCE = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2026/2026 APAC Performance.xlsx'
 // Fallback: Manual extraction path
 const FALLBACK_SOURCE = '/tmp/burc-source/BURC/2026/2026 APAC Performance.xlsx'
 // Use primary source, then fallback
