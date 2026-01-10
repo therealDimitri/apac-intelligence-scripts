@@ -8,7 +8,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || 'sb_secret_tg9qhHtwhKS0rPe_FUgzKA_nOyqLAas'
 );
 
-const EXCEL_PATH = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/Documents/Client Success/Team Docs/Sales Targets/2026/APAC 2026 Sales Budget 6Jan2026.xlsx';
+const EXCEL_PATH = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/Documents/Client Success/Team Docs/Sales Targets/2026/APAC 2026 Sales Budget 6Jan2026.xlsx';
 
 async function createTables() {
   console.log('Creating tables...');

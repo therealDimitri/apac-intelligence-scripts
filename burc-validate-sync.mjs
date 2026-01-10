@@ -760,7 +760,7 @@ async function main() {
 
   // Default to validating all recent files
   if (!filePath) {
-    const BURC_BASE = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Leadership Team - General/Performance/Financials/BURC';
+    const BURC_BASE = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC';
 
     const files = [
       { year: 2026, path: `${BURC_BASE}/2026/2026 APAC Performance.xlsx` },

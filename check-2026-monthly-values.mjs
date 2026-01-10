@@ -1,6 +1,6 @@
 import XLSX from 'xlsx';
 
-const burcPath = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Leadership Team - General/Performance/Financials/BURC/2026/2026 APAC Performance.xlsx';
+const burcPath = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2026/2026 APAC Performance.xlsx';
 
 const workbook = XLSX.readFile(burcPath);
 const burcSheet = workbook.Sheets['APAC BURC'];

@@ -5,7 +5,7 @@
 
 import XLSX from 'xlsx'
 
-const filePath = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Leadership Team - General/Performance/Financials/BURC/APAC Revenue 2019 - 2024.xlsx'
+const filePath = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/APAC Revenue 2019 - 2024.xlsx'
 
 const fmt = (v) => {
   if (v === undefined || v === null || isNaN(v)) return ''

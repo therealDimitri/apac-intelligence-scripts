@@ -34,7 +34,7 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase = createClient(supabaseUrl, supabaseKey)
 
 // Base path for BURC files
-const BURC_BASE = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Leadership Team - General/Performance/Financials/BURC'
+const BURC_BASE = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC'
 
 // Current year Performance file
 const PERFORMANCE_FILE_2026 = `${BURC_BASE}/2026/2026 APAC Performance.xlsx`

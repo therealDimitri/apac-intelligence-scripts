@@ -21,7 +21,7 @@ const __dirname = dirname(__filename);
 dotenv.config({ path: join(__dirname, '../.env.local') });
 
 // Configuration - SECURITY: Use environment variables for secrets
-const EXCEL_PATH = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Clients - Client Success/Client Segmentation/APAC Client Segmentation Activity Register 2025.xlsx';
+const EXCEL_PATH = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Clients - Client Success/Client Segmentation/APAC Client Segmentation Activity Register 2025.xlsx';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace('https://', '') || '';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 

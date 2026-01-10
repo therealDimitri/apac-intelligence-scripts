@@ -6,7 +6,7 @@
 import XLSX from 'xlsx';
 import fs from 'fs';
 
-const EXCEL_PATH = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Clients - Client Success/Client Segmentation/APAC Client Segmentation Activity Register 2025.xlsx';
+const EXCEL_PATH = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Clients - Client Success/Client Segmentation/APAC Client Segmentation Activity Register 2025.xlsx';
 
 const buffer = fs.readFileSync(EXCEL_PATH);
 const workbook = XLSX.read(buffer, { type: 'buffer' });

@@ -6,7 +6,7 @@
 import XLSX from 'xlsx'
 import fs from 'fs'
 
-const BURC_PATH = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Leadership Team - General/Performance/Financials/BURC'
+const BURC_PATH = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC'
 
 const files = [
   { name: '2026 APAC Performance', path: `${BURC_PATH}/2026/2026 APAC Performance.xlsx` },

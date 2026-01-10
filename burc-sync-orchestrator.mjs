@@ -56,7 +56,7 @@ const SYNC_SCRIPTS = {
 
 const VALIDATION_SCRIPT = path.join(__dirname, 'burc-validate-sync.mjs');
 
-const BURC_BASE = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Leadership Team - General/Performance/Financials/BURC';
+const BURC_BASE = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC';
 
 const BURC_FILES = {
   2026: `${BURC_BASE}/2026/2026 APAC Performance.xlsx`,

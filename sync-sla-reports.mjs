@@ -17,12 +17,12 @@ const supabase = createClient(
 
 // Client SLA report paths
 const CLIENT_PATHS = {
-  'WA Health': '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Clients - Client Success/Client Meetings/WA Health/SLA Reports',
-  'SA Health': '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Clients - Client Success/Client Meetings/SA Health/SLA Reports',
-  'Grampians': '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Clients - Client Success/Client Meetings/Grampians/SLA Reports',
-  'RVEEH': '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Clients - Client Success/Client Meetings/RVEEH/SLA Reports',
-  'Barwon Health': '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Clients - Client Success/Client Meetings/Barwon Health/SLA Reports',
-  'Albury Wodonga Health': '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Clients - Client Success/Client Meetings/Albury Wodonga/SLA Reports',
+  'WA Health': '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Clients - Client Success/Client Meetings/WA Health/SLA Reports',
+  'SA Health': '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Clients - Client Success/Client Meetings/SA Health/SLA Reports',
+  'Grampians': '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Clients - Client Success/Client Meetings/Grampians/SLA Reports',
+  'RVEEH': '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Clients - Client Success/Client Meetings/RVEEH/SLA Reports',
+  'Barwon Health': '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Clients - Client Success/Client Meetings/Barwon Health/SLA Reports',
+  'Albury Wodonga Health': '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Clients - Client Success/Client Meetings/Albury Wodonga/SLA Reports',
 };
 
 // Month name to number mapping

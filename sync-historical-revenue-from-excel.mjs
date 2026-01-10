@@ -66,7 +66,7 @@ async function syncHistoricalRevenue() {
   // Read Excel file
   const excelPath = path.join(
     process.env.HOME,
-    'Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Leadership Team - General/Performance/Financials/BURC/APAC Revenue 2019 - 2024.xlsx'
+    'Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/APAC Revenue 2019 - 2024.xlsx'
   );
 
   console.log('Reading:', excelPath);

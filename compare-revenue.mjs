@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import XLSX from 'xlsx';
 
-dotenv.config({ path: '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Clients - Client Success/CS Connect Meetings/Sandbox/apac-intelligence-v2/.env.local' });
+dotenv.config({ path: '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Clients - Client Success/CS Connect Meetings/Sandbox/apac-intelligence-v2/.env.local' });
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -36,7 +36,7 @@ async function run() {
   }
 
   // Read Excel file
-  const excelPath = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Leadership Team - General/Performance/Financials/BURC/APAC Revenue 2019 - 2024.xlsx';
+  const excelPath = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/APAC Revenue 2019 - 2024.xlsx';
   const wb = XLSX.readFile(excelPath);
   const sheet = wb.Sheets['Customer Level Summary'];
   const excelData = XLSX.utils.sheet_to_json(sheet, { header: 1 });

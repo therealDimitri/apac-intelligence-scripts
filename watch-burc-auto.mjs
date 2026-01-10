@@ -46,7 +46,7 @@ const supabase = createClient(
 // Configuration
 // ============================================================================
 
-const BURC_BASE = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Leadership Team - General/Performance/Financials/BURC';
+const BURC_BASE = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC';
 
 const WATCH_PATHS = [
   `${BURC_BASE}/2026/**/*.xlsx`,

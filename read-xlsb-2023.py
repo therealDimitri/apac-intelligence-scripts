@@ -7,7 +7,7 @@ import json
 import os
 from pyxlsb import open_workbook
 
-BURC_PATH = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Leadership Team - General/Performance/Financials/BURC'
+BURC_PATH = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC'
 XLSB_FILE = f'{BURC_PATH}/2023/Dec 23/2023 12 BURC File.xlsb'
 OUTPUT_FILE = '/tmp/burc-2023-data.json'
 

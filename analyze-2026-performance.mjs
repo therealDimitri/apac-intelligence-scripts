@@ -1,7 +1,7 @@
 import XLSX from 'xlsx';
 
 // Correct 2026 file
-const burcPath = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Leadership Team - General/Performance/Financials/BURC/2026/2026 APAC Performance.xlsx';
+const burcPath = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2026/2026 APAC Performance.xlsx';
 
 console.log('=== ANALYZING 2026 APAC PERFORMANCE FILE ===\n');
 console.log('File: ' + burcPath);

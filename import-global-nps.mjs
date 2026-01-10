@@ -28,7 +28,7 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const EXCEL_PATH = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Clients - Client Success/NPS/Data/Global/Q4.25 NPS Comments_Global.xlsx';
+const EXCEL_PATH = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Clients - Client Success/NPS/Data/Global/Q4.25 NPS Comments_Global.xlsx';
 
 // Normalise text for comparison
 function normaliseText(text) {

@@ -1,7 +1,7 @@
 import XLSX from 'xlsx';
 import { resolve } from 'path';
 
-const burcPath = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Leadership Team - General/Performance/Financials/BURC/2025/2025 APAC Performance.xlsx';
+const burcPath = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2025/2025 APAC Performance.xlsx';
 
 console.log('=== Reading BURC Performance File ===\n');
 console.log('File:', burcPath);
