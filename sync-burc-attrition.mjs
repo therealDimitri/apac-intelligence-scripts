@@ -191,19 +191,30 @@ async function syncAttritionData() {
     console.log(`  ${i + 1}. ${r.client_name} (${r.risk_type}) - $${(r.total_at_risk / 1000).toFixed(0)}K at risk`)
   })
 
-  // Upsert to Supabase
+  // Delete existing records and insert fresh data
   console.log('\n💾 Syncing to Supabase...')
 
+  // First, delete existing records for today's snapshot
+  const today = new Date().toISOString().split('T')[0]
+  console.log(`  🗑️  Clearing existing records for snapshot date: ${today}`)
+
+  const { error: deleteError } = await supabase
+    .from('burc_attrition_risk')
+    .delete()
+    .eq('snapshot_date', today)
+
+  if (deleteError) {
+    console.warn(`  ⚠️  Delete warning: ${deleteError.message}`)
+  }
+
+  // Insert new records
   const { data, error } = await supabase
     .from('burc_attrition_risk')
-    .upsert(attritionRecords, {
-      onConflict: 'client_name,forecast_date',
-      ignoreDuplicates: false,
-    })
+    .insert(attritionRecords)
     .select()
 
   if (error) {
-    console.error('❌ Error syncing to Supabase:', error.message)
+    console.error('❌ Error inserting to Supabase:', error.message)
 
     // Try inserting one by one if bulk fails
     console.log('\n🔄 Attempting individual inserts...')
@@ -213,20 +224,20 @@ async function syncAttritionData() {
     for (const record of attritionRecords) {
       const { error: singleError } = await supabase
         .from('burc_attrition_risk')
-        .upsert(record, { onConflict: 'client_name,forecast_date' })
+        .insert(record)
 
       if (singleError) {
         console.error(`  ❌ Failed: ${record.client_name} - ${singleError.message}`)
         failCount++
       } else {
-        console.log(`  ✅ Synced: ${record.client_name}`)
+        console.log(`  ✅ Inserted: ${record.client_name}`)
         successCount++
       }
     }
 
     console.log(`\n📊 Individual sync results: ${successCount} success, ${failCount} failed`)
   } else {
-    console.log(`✅ Successfully synced ${data?.length || attritionRecords.length} records`)
+    console.log(`✅ Successfully inserted ${data?.length || attritionRecords.length} records`)
   }
 
   // Log sync to audit table

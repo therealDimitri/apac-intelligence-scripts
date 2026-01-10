@@ -49,9 +49,20 @@ const CLIENT_NAME_MAP = {
 };
 
 /**
- * Revenue type mapping: Excel PnL Rollup → Database revenue_type
+ * Revenue type mapping: Excel Altera Sub Rollup → Database revenue_type
+ * Updated for new file format "APAC revenue analysis 2019 through present.xlsx"
  */
 const REVENUE_TYPE_MAP = {
+  // New file format (Altera Sub Rollup column)
+  'Altera Gross License Revenue': 'License Revenue',
+  'Altera Total Hardware Revenue': 'Hardware & Other Revenue',
+  'Altera Total Maintenance Revenue': 'Maintenance Revenue',
+  'Altera Total Other Revenue': 'Hardware & Other Revenue',
+  'Altera Total PS Revenue': 'Professional Services Revenue',
+  'Altera Total Professional Services Revenue': 'Professional Services Revenue',
+  'Altera Total Outsourcing Revenue': 'Hardware & Other Revenue',
+  'Altera Total Remote Hosting Revenue': 'Maintenance Revenue',
+  // Legacy format (for backwards compatibility)
   'Hardware & Other Revenue': 'Hardware & Other Revenue',
   'License Revenue': 'License Revenue',
   'Maintenance Revenue': 'Maintenance Revenue',
@@ -63,10 +74,10 @@ async function syncHistoricalRevenue() {
   console.log('Mode:', DRY_RUN ? 'DRY RUN (no changes)' : 'LIVE');
   console.log('');
 
-  // Read Excel file
+  // Read Excel file - Updated path to Budget Planning folder
   const excelPath = path.join(
     process.env.HOME,
-    'Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/APAC Revenue 2019 - 2024.xlsx'
+    'Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2025/Budget Planning/APAC revenue analysis 2019 through present.xlsx'
   );
 
   console.log('Reading:', excelPath);
@@ -74,30 +85,31 @@ async function syncHistoricalRevenue() {
   const sheet = wb.Sheets['Customer Level Summary'];
   const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-  // Year columns (0-indexed)
-  const yearCols = { 2019: 3, 2020: 4, 2021: 5, 2022: 6, 2023: 7, 2024: 8 };
+  // Year columns (0-indexed) - Updated for new file with 2019-2023
+  const yearCols = { 2019: 3, 2020: 4, 2021: 5, 2022: 6, 2023: 7 };
 
-  // Parse data rows
+  // Parse data rows (start from row 1, header is row 0)
   const records = [];
-  let currentCustomer = '';
 
-  for (let i = 2; i < data.length; i++) {
+  for (let i = 1; i < data.length; i++) {
     const row = data[i];
+    if (!row || row.length < 4) continue;
 
-    // Update customer name if present
-    if (row?.[1]) {
-      currentCustomer = row[1];
+    const customerName = row[1];
+    const rollup = row[2];
+
+    // Skip total rows and non-revenue rows
+    if (!customerName || !rollup || !REVENUE_TYPE_MAP[rollup]) {
+      continue;
     }
 
-    const rollup = row?.[2];
-
-    // Skip non-revenue rows (like Annual Variance)
-    if (!rollup || !REVENUE_TYPE_MAP[rollup] || !currentCustomer) {
+    // Skip summary/total rows
+    if (customerName.toLowerCase().includes('total') || customerName.toLowerCase().includes('grand')) {
       continue;
     }
 
     // Map client name to canonical
-    const canonicalClient = CLIENT_NAME_MAP[currentCustomer] || currentCustomer;
+    const canonicalClient = CLIENT_NAME_MAP[customerName] || customerName;
 
     // Create records for each year
     for (const [year, col] of Object.entries(yearCols)) {
