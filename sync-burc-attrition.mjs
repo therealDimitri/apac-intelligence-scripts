@@ -245,11 +245,13 @@ async function syncAttritionData() {
     .from('burc_sync_audit')
     .insert({
       sync_id: crypto.randomUUID(),
+      sync_type: 'attrition',
       table_name: 'burc_attrition_risk',
       operation: 'sync',
-      record_count: attritionRecords.length,
+      records_processed: attritionRecords.length,
       records_inserted: attritionRecords.length,
-      metadata: { source: burcPath, sheet: attritionSheetName }
+      source_file: burcPath,
+      metadata: { sheet: attritionSheetName }
     })
 
   if (auditError) {
