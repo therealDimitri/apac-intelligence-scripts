@@ -90,6 +90,62 @@ const CLIENT_NORMALISATION = {
   // Te Whatu Ora
   'te whatu ora waikato': 'waikato',
   'waikato': 'waikato',
+
+  // Department of Health - Victoria
+  'department of health - victoria': 'doh victoria',
+  'department of health victoria': 'doh victoria',
+  'doh victoria': 'doh victoria',
+  'doh': 'doh victoria',
+
+  // St Luke's Medical Center
+  "st luke's medical center global city inc": 'st lukes',
+  "st luke's medical centre global city inc": 'st lukes',
+  "st luke's medical center": 'st lukes',
+  "st luke's medical centre": 'st lukes',
+  'slmc': 'st lukes',
+  'st lukes': 'st lukes',
+
+  // NCS additional variations
+  'ncs pte ltd': 'ncs mindef',
+  'ncs pte': 'ncs mindef',
+
+  // SingHealth variations
+  'singhealth': 'singhealth',
+  'sing health': 'singhealth',
+
+  // Parkway
+  'parkway hospitals singapore pte ltd': 'parkway',
+  'parkway hospitals': 'parkway',
+  'parkway': 'parkway',
+
+  // Epworth
+  'epworth healthcare': 'epworth',
+  'epworth': 'epworth',
+
+  // Western Health
+  'western health': 'western health',
+
+  // Grampians Health
+  'grampians health': 'grampians',
+  'grampians': 'grampians',
+
+  // KK Women's and Children's
+  "kk women's and children's hospital": 'kkh',
+  'kkh': 'kkh',
+
+  // Singapore General Hospital
+  'singapore general hospital pte ltd': 'sgh',
+  'singapore general hospital': 'sgh',
+  'sgh': 'sgh',
+
+  // Changi General Hospital
+  'changi general hospital': 'cgh',
+  'cgh': 'cgh',
+
+  // Sengkang General Hospital
+  'sengkang general hospital pte. ltd.': 'skh',
+  'sengkang general hospital': 'skh',
+  'skh': 'skh',
 }
 
 // ============================================================================
