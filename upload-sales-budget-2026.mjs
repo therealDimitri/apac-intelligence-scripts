@@ -1,3 +1,12 @@
+/**
+ * @deprecated Use sync-sales-budget-2026-v2.mjs instead
+ *
+ * This script is superseded by sync-sales-budget-2026-v2.mjs which:
+ * - Uses the new APAC Pipeline by Qtr (RECON) sheet
+ * - Includes Oracle Quote Detail data
+ * - Maps "New Asia CSE" to "Open Role"
+ */
+
 import { createClient } from '@supabase/supabase-js';
 import XLSX from 'xlsx';
 import { fileURLToPath } from 'url';

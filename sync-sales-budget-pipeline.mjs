@@ -1,10 +1,14 @@
 #!/usr/bin/env node
 
 /**
- * Sync Sales Budget Pipeline Opportunities
+ * @deprecated Use sync-sales-budget-2026-v2.mjs instead
  *
- * Imports pipeline data from "APAC Pipeline by Qtr (2)" sheet in APAC 2026 Sales Budget Excel
- * Cross-references with BURC pipeline data and marks matches
+ * Sync Sales Budget Pipeline Opportunities (LEGACY)
+ *
+ * This script is superseded by sync-sales-budget-2026-v2.mjs which:
+ * - Uses the new APAC Pipeline by Qtr (RECON) sheet
+ * - Includes Oracle Quote Detail data
+ * - Maps "New Asia CSE" to "Open Role"
  *
  * Usage:
  *   node scripts/sync-sales-budget-pipeline.mjs --dry-run   # Preview only
