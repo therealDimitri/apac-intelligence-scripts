@@ -24,6 +24,7 @@ const CLIENT_PATHS = {
   'Barwon Health': '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Clients - Client Success/Client Meetings/Barwon Health/SLA Reports',
   'Albury Wodonga Health': '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Clients - Client Success/Client Meetings/Albury Wodonga/SLA Reports',
   'Epworth Healthcare': '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Clients - Client Success/Client Meetings/Epworth Healthcare/SLA Reviews',
+  'Western Health': '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Clients - Client Success/Client Meetings/Western Health/SLA Reviews',
 };
 
 // Month name to number mapping
