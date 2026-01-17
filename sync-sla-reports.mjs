@@ -158,7 +158,17 @@ function extractCaseVolume(workbook) {
  * Extract open aging cases
  */
 function extractAgingCases(workbook) {
-  const sheet = findSheet(workbook, 'Open Aging', 'Aging Cases', 'Aging Rough');
+  // Try to find the most recent OpenAging sheet first (e.g., "OpenAging Q12026")
+  let sheet = null;
+  const openAgingSheets = workbook.SheetNames.filter(s =>
+    s.toLowerCase().includes('openaging') && !s.toLowerCase().includes('messed')
+  ).sort().reverse(); // Most recent first
+
+  if (openAgingSheets.length > 0) {
+    sheet = workbook.Sheets[openAgingSheets[0]];
+  } else {
+    sheet = findSheet(workbook, 'Open Aging', 'Aging Cases', 'Aging Rough');
+  }
   if (!sheet) return { total: 0, byAge: {}, byPriority: {}, cases: [] };
 
   const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
@@ -259,14 +269,59 @@ function extractAgingCases(workbook) {
  *   Row: Grand Total with compliance percentage in last column
  */
 function extractSLACompliance(workbook) {
-  const sheet = findSheet(workbook, 'SLA Compliance', 'Resolution Compliance', 'Response');
-  if (!sheet) return { response: null, resolution: null, breachCount: 0 };
-
-  const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-
   let response = null;
   let resolution = null;
   let breachCount = 0;
+
+  // Try combined SLA Compliance sheet first
+  let sheet = findSheet(workbook, 'SLA Compliance');
+
+  // If not found, try separate sheets for Response and Resolution
+  if (!sheet) {
+    // Try Resolution Compliance sheet
+    const resSheet = findSheet(workbook, 'Resolution Compliance');
+    if (resSheet) {
+      const resData = XLSX.utils.sheet_to_json(resSheet, { header: 1 });
+      for (const row of resData) {
+        if (!row) continue;
+        const firstCell = String(row[0] || '').toLowerCase().trim();
+        if (firstCell === 'grand total') {
+          for (let j = row.length - 1; j >= 1; j--) {
+            const val = parseFloat(row[j]);
+            if (!isNaN(val) && val > 0 && val <= 100) {
+              resolution = val > 1 ? val : val * 100;
+              console.log(`    Found Resolution SLA: ${resolution.toFixed(1)}%`);
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    // Try Response and Comm Compliance sheet
+    const respSheet = findSheet(workbook, 'Response and Comm', 'Response Time');
+    if (respSheet) {
+      const respData = XLSX.utils.sheet_to_json(respSheet, { header: 1 });
+      for (const row of respData) {
+        if (!row) continue;
+        const firstCell = String(row[0] || '').toLowerCase().trim();
+        if (firstCell === 'grand total') {
+          for (let j = row.length - 1; j >= 1; j--) {
+            const val = parseFloat(row[j]);
+            if (!isNaN(val) && val > 0 && val <= 100) {
+              response = val > 1 ? val : val * 100;
+              console.log(`    Found Response SLA: ${response.toFixed(1)}%`);
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    return { response, resolution, breachCount };
+  }
+
+  const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
   // Track which section we're in
   let currentSection = null;
