@@ -1,119 +1,64 @@
+import { config } from 'dotenv';
+config({ path: '/Users/jimmy.leimonitis/Documents/GitHub/apac-intelligence-v2/.env.local' });
 import { createClient } from '@supabase/supabase-js';
-import dotenv from 'dotenv';
-import XLSX from 'xlsx';
-
-dotenv.config({ path: '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Clients - Client Success/CS Connect Meetings/Sandbox/apac-intelligence-v2/.env.local' });
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-async function run() {
-  // Query database
-  const { data, error } = await supabase
+async function compare() {
+  // Get annual financials from burc_annual_financials
+  const { data: annual } = await supabase
+    .from('burc_annual_financials')
+    .select('fiscal_year, gross_revenue, sw_revenue, ps_revenue, maint_revenue, hw_revenue')
+    .gte('fiscal_year', 2024)
+    .order('fiscal_year');
+
+  console.log('=== App Database: burc_annual_financials ===');
+  annual.forEach(r => {
+    console.log('FY' + r.fiscal_year + ':');
+    console.log('  Total: $' + (r.gross_revenue/1000000).toFixed(2) + 'M');
+    console.log('  SW: $' + ((r.sw_revenue || 0)/1000000).toFixed(2) + 'M');
+    console.log('  PS: $' + ((r.ps_revenue || 0)/1000000).toFixed(2) + 'M');
+    console.log('  Maint: $' + ((r.maint_revenue || 0)/1000000).toFixed(2) + 'M');
+    console.log('  HW: $' + ((r.hw_revenue || 0)/1000000).toFixed(2) + 'M');
+  });
+
+  // Get detail data grouped by year
+  const { data: detail } = await supabase
     .from('burc_historical_revenue_detail')
-    .select('client_name, fiscal_year, amount_usd');
+    .select('fiscal_year, revenue_type, amount_usd, client_name')
+    .gte('fiscal_year', 2024);
 
-  if (error) {
-    console.error('Error:', error);
-    return;
-  }
+  // Aggregate by year and type, excluding aggregates
+  const excludeNames = ['apac total', 'total', 'baseline', '(blank)', 'dbm to apac profit share', 'hosting to apac profit share', 'ms to apac profit share'];
 
-  // Aggregate by client
-  const dbClientTotals = {};
-  for (const row of data) {
-    const client = row.client_name;
-    if (!dbClientTotals[client]) {
-      dbClientTotals[client] = { 2019: 0, 2020: 0, 2021: 0, 2022: 0, 2023: 0, 2024: 0, total: 0 };
-    }
-    const year = row.fiscal_year;
-    const amount = parseFloat(row.amount_usd) || 0;
-    if (dbClientTotals[client][year] !== undefined) {
-      dbClientTotals[client][year] += amount;
-    }
-    dbClientTotals[client].total += amount;
-  }
+  const byYear = {};
+  detail.forEach(r => {
+    const clientLower = (r.client_name || '').toLowerCase().trim();
+    if (excludeNames.some(e => clientLower.includes(e) || clientLower === e)) return;
 
-  // Read Excel file
-  const excelPath = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/APAC Revenue 2019 - 2024.xlsx';
-  const wb = XLSX.readFile(excelPath);
-  const sheet = wb.Sheets['Customer Level Summary'];
-  const excelData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+    const y = r.fiscal_year;
+    if (!byYear[y]) byYear[y] = { total: 0, sw: 0, ps: 0, maint: 0, hw: 0 };
+    byYear[y].total += r.amount_usd || 0;
 
-  // Parse Excel data
-  const revenueTypes = [
-    'Hardware & Other Revenue',
-    'License Revenue',
-    'Maintenance Revenue',
-    'Professional Services Revenue'
-  ];
+    const type = (r.revenue_type || '').toLowerCase();
+    if (type.includes('software') || type.includes('license')) byYear[y].sw += r.amount_usd || 0;
+    else if (type.includes('professional') || type.includes('ps')) byYear[y].ps += r.amount_usd || 0;
+    else if (type.includes('maint')) byYear[y].maint += r.amount_usd || 0;
+    else if (type.includes('hardware') || type.includes('hw')) byYear[y].hw += r.amount_usd || 0;
+  });
 
-  const yearCols = { 2019: 3, 2020: 4, 2021: 5, 2022: 6, 2023: 7, 2024: 8 };
-  const excelClientTotals = {};
-
-  let currentCustomer = '';
-  for (let i = 2; i < excelData.length; i++) {
-    const row = excelData[i];
-    if (row?.[1]) {
-      currentCustomer = row[1];
-    }
-
-    const rollup = row?.[2];
-    if (rollup && revenueTypes.includes(rollup) && currentCustomer) {
-      if (!excelClientTotals[currentCustomer]) {
-        excelClientTotals[currentCustomer] = { 2019: 0, 2020: 0, 2021: 0, 2022: 0, 2023: 0, 2024: 0, total: 0 };
-      }
-
-      for (const [year, col] of Object.entries(yearCols)) {
-        const val = parseFloat(row[col]) || 0;
-        excelClientTotals[currentCustomer][year] += val;
-        excelClientTotals[currentCustomer].total += val;
-      }
-    }
-  }
-
-  // Compare
-  console.log('=== COMPARISON: Excel vs Database (2024 Revenue) ===\n');
-  console.log('Client'.padEnd(48) + '| Excel 2024 | DB 2024   | Gap');
-  console.log('-'.repeat(85));
-
-  const excelClients = Object.entries(excelClientTotals)
-    .sort((a, b) => b[1].total - a[1].total);
-
-  let totalExcel2024 = 0;
-  let totalDb2024 = 0;
-
-  for (const [excelClient, excelYears] of excelClients) {
-    // Try to find matching DB client
-    const dbMatch = Object.entries(dbClientTotals).find(([dbClient]) => {
-      return dbClient.toLowerCase().includes(excelClient.toLowerCase().substring(0, 15)) ||
-             excelClient.toLowerCase().includes(dbClient.toLowerCase().substring(0, 15));
-    });
-
-    const excelVal = excelYears[2024];
-    const dbVal = dbMatch ? dbMatch[1][2024] : 0;
-    const gap = excelVal - dbVal;
-
-    totalExcel2024 += excelVal;
-    totalDb2024 += dbVal;
-
-    console.log(`${excelClient.substring(0, 47).padEnd(48)}| $${(excelVal/1e6).toFixed(2).padStart(6)}M | $${(dbVal/1e6).toFixed(2).padStart(6)}M | $${(gap/1e6).toFixed(2)}M`);
-  }
-
-  console.log('-'.repeat(85));
-  console.log(`${'TOTALS'.padEnd(48)}| $${(totalExcel2024/1e6).toFixed(2).padStart(6)}M | $${(totalDb2024/1e6).toFixed(2).padStart(6)}M | $${((totalExcel2024-totalDb2024)/1e6).toFixed(2)}M`);
-
-  console.log('\n=== DATABASE CLIENTS NOT IN EXCEL ===');
-  for (const [dbClient, dbYears] of Object.entries(dbClientTotals)) {
-    const inExcel = Object.keys(excelClientTotals).some(ec =>
-      ec.toLowerCase().includes(dbClient.toLowerCase().substring(0, 10)) ||
-      dbClient.toLowerCase().includes(ec.toLowerCase().substring(0, 10))
-    );
-    if (!inExcel && dbYears.total > 100000) {
-      console.log(`${dbClient}: $${(dbYears.total/1e6).toFixed(2)}M total, $${(dbYears[2024]/1e6).toFixed(2)}M in 2024`);
-    }
-  }
+  console.log('\n=== App Database: burc_historical_revenue_detail (filtered) ===');
+  Object.entries(byYear).sort().forEach(([y, d]) => {
+    console.log('FY' + y + ':');
+    console.log('  Total: $' + (d.total/1000000).toFixed(2) + 'M');
+    console.log('  SW: $' + (d.sw/1000000).toFixed(2) + 'M');
+    console.log('  PS: $' + (d.ps/1000000).toFixed(2) + 'M');
+    console.log('  Maint: $' + (d.maint/1000000).toFixed(2) + 'M');
+    console.log('  HW: $' + (d.hw/1000000).toFixed(2) + 'M');
+  });
 }
 
-run();
+compare();
