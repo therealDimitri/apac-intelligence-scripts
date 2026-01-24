@@ -110,8 +110,8 @@ async function syncAgedAccounts() {
     }
   )
 
-  // Filter excluded clients
-  const excludedClients = ['provation', 'iqht', 'philips', 'altera']
+  // Filter excluded clients (non-client entities)
+  const excludedClients = ['provation', 'iqht', 'philips', 'altera', 'adelaide milk services', 'cirka', 'floc']
   const clients = Object.values(clientMap).filter(client => {
     const lower = client.client.toLowerCase()
     return !excludedClients.some(ex => lower.includes(ex))
