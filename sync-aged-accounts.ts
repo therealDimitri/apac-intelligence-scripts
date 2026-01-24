@@ -84,8 +84,8 @@ async function syncAgedAccounts() {
     '>365': 'over365',
   }
 
-  (Object.entries(agingReport.buckets || {}) as [string, { clients: Record<string, { totalUSD: number }> }][]).forEach(
-    ([bucket, data]) => {
+  const buckets = agingReport.buckets as Record<string, { clients: Record<string, { totalUSD: number }> }> || {}
+  Object.entries(buckets).forEach(([bucket, data]) => {
       const field = bucketMapping[bucket]
       if (!field || !data.clients) return
 
