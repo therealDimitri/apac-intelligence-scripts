@@ -71,121 +71,123 @@ function parseBURCFile(): BURCIndexes {
     const buffer = fs.readFileSync(BURC_PATH)
     const workbook = XLSX.read(buffer, { type: 'buffer' })
 
-    // Parse DIAL 2 sheet for backlog categories
-    const dial2Sheet = workbook.Sheets['DIAL 2']
-    if (dial2Sheet) {
-      const dial2Data = XLSX.utils.sheet_to_json(dial2Sheet, { header: 1 }) as unknown[][]
+    // Helper to add entry to indexes
+    const addEntry = (entry: BURCEntry) => {
+      indexes.byName.set(entry.name.toLowerCase(), entry)
+      if (entry.oracleNumber && entry.oracleNumber !== 'Various' && String(entry.oracleNumber).length > 1) {
+        // Also index without trailing letters (e.g., "545891a" -> "545891")
+        indexes.byOracleNumber.set(String(entry.oracleNumber).trim(), entry)
+        const baseNumber = String(entry.oracleNumber).replace(/[a-zA-Z]+$/, '')
+        if (baseNumber !== entry.oracleNumber) {
+          indexes.byOracleNumber.set(baseNumber, entry)
+        }
+      }
+    }
 
-      // Find sections in DIAL 2
-      const sections = [
-        { name: 'dial2-green', startText: 'GREEN', endText: 'YELLOW' },
-        { name: 'dial2-yellow', startText: 'YELLOW', endText: 'RED' },
-        { name: 'dial2-red', startText: 'RED', endText: 'Business Case' },
-        { name: 'dial2-business-case', startText: 'Business Case', endText: 'Pipeline' },
-        { name: 'dial2-pipeline-not-included', startText: 'Pipeline (not', endText: null },
-      ]
+    // Parse "Dial 2 Risk Profile Summary" sheet
+    const dialSheet = workbook.Sheets['Dial 2 Risk Profile Summary']
+    if (dialSheet) {
+      const data = XLSX.utils.sheet_to_json(dialSheet, { header: 1 }) as unknown[][]
 
-      let currentSection: string | null = null
-      let inDataRows = false
+      // Structure: Row 0-2 headers, Row 3+ has section markers and data
+      // Column 0: Opty Name (or section marker like "Green:")
+      // Column 1: F/Cast Category
+      // Column 2: Closure Date
+      // Column 3: Oracle Agreement #
 
-      for (let i = 0; i < dial2Data.length; i++) {
-        const row = dial2Data[i]
+      let currentSection = 'dial2-green' // Default to green
+
+      for (let i = 3; i < data.length; i++) {
+        const row = data[i]
         if (!row || row.length === 0) continue
 
         const firstCell = String(row[0] || '').trim()
+        const firstCellLower = firstCell.toLowerCase()
 
-        // Check if we're entering a new section
-        for (const section of sections) {
-          if (firstCell.toLowerCase().includes(section.startText.toLowerCase())) {
-            currentSection = section.name
-            inDataRows = false
-            break
-          }
-        }
-
-        // Check for header row (contains "Forecast Category" or similar)
-        if (
-          currentSection &&
-          (firstCell.toLowerCase().includes('forecast') ||
-            String(row[1] || '')
-              .toLowerCase()
-              .includes('opty name'))
-        ) {
-          inDataRows = true
+        // Detect section markers
+        if (firstCellLower === 'green:' || firstCellLower.startsWith('green:')) {
+          currentSection = 'dial2-green'
+          continue
+        } else if (firstCellLower === 'yellow:' || firstCellLower.startsWith('yellow:')) {
+          currentSection = 'dial2-yellow'
+          continue
+        } else if (firstCellLower === 'red:' || firstCellLower.startsWith('red:')) {
+          currentSection = 'dial2-red'
+          continue
+        } else if (firstCellLower.includes('business case')) {
+          currentSection = 'dial2-business-case'
+          continue
+        } else if (firstCellLower.includes('pipeline') && firstCellLower.includes('not included')) {
+          currentSection = 'dial2-pipeline-not-included'
           continue
         }
 
-        // Parse data rows
-        if (currentSection && inDataRows && row[1]) {
-          const optyName = String(row[1] || '').trim()
-          const oracleNumber = String(row[3] || '').trim()
-          const accountName = String(row[4] || '').trim()
-          const acv = parseFloat(String(row[5] || '0')) || 0
+        // Skip non-data rows
+        if (!firstCell || firstCell.length < 3 ||
+            firstCellLower.includes('total') ||
+            firstCellLower.includes('sub-total') ||
+            firstCellLower.includes('rats and mice - collated') ||
+            firstCellLower.includes('anything') ||
+            firstCellLower.includes('date the revenue')) {
+          continue
+        }
 
-          if (optyName && optyName !== '' && !optyName.toLowerCase().includes('total')) {
-            const entry: BURCEntry = {
-              name: optyName,
-              forecastCategory: String(row[0] || '').trim(),
-              oracleNumber,
-              accountName,
-              acv,
-              section: currentSection,
-            }
+        const forecastCategory = String(row[1] || '').trim()
+        const oracleNumber = String(row[3] || '').trim()
 
-            indexes.byName.set(optyName.toLowerCase(), entry)
-            if (oracleNumber) {
-              indexes.byOracleNumber.set(oracleNumber, entry)
-            }
-          }
+        // Only add if it has a forecast category (actual data row)
+        if (forecastCategory) {
+          addEntry({
+            name: firstCell,
+            forecastCategory,
+            oracleNumber,
+            accountName: '',
+            acv: 0,
+            section: currentSection,
+          })
         }
       }
+      console.log(`[Import] Loaded ${indexes.byName.size} entries from Dial 2 Risk Profile Summary`)
     }
 
-    // Parse Best Case sheet
-    const bestCaseSheet = workbook.Sheets['Best Case']
-    if (bestCaseSheet) {
-      const bestCaseData = XLSX.utils.sheet_to_json(bestCaseSheet, { header: 1 }) as unknown[][]
+    // Parse "Rats and Mice Only" sheet
+    const ratsSheet = workbook.Sheets['Rats and Mice Only']
+    if (ratsSheet) {
+      const data = XLSX.utils.sheet_to_json(ratsSheet, { header: 1 }) as unknown[][]
 
-      let headerFound = false
-      for (let i = 0; i < bestCaseData.length; i++) {
-        const row = bestCaseData[i]
+      // Structure similar to Dial 2: Opty Name in col 0, Oracle # in col 3
+      for (let i = 4; i < data.length; i++) { // Data starts from row 5 (index 4)
+        const row = data[i]
         if (!row || row.length === 0) continue
 
-        const firstCell = String(row[0] || '').trim().toLowerCase()
+        const optyName = String(row[0] || '').trim()
+        const optyNameLower = optyName.toLowerCase()
 
-        if (firstCell.includes('forecast') || firstCell.includes('opty')) {
-          headerFound = true
+        // Skip non-data rows
+        if (!optyName || optyName.length < 3 ||
+            optyNameLower.includes('total') ||
+            optyNameLower.includes('rats and mice - balance')) {
           continue
         }
 
-        if (headerFound && row[1]) {
-          const optyName = String(row[1] || '').trim()
-          const oracleNumber = String(row[3] || '').trim()
-          const accountName = String(row[4] || '').trim()
-          const acv = parseFloat(String(row[5] || '0')) || 0
+        const oracleNumber = String(row[3] || '').trim()
 
-          if (optyName && optyName !== '' && !optyName.toLowerCase().includes('total')) {
-            const entry: BURCEntry = {
-              name: optyName,
-              forecastCategory: String(row[0] || '').trim(),
-              oracleNumber,
-              accountName,
-              acv,
-              section: 'best-case',
-            }
-
-            indexes.byName.set(optyName.toLowerCase(), entry)
-            if (oracleNumber) {
-              indexes.byOracleNumber.set(oracleNumber, entry)
-            }
-          }
+        // Only add if we have an opportunity name and it's not already in the index
+        if (optyName && !indexes.byName.has(optyNameLower)) {
+          addEntry({
+            name: optyName,
+            forecastCategory: 'Best Case', // R&M items are typically best case
+            oracleNumber,
+            accountName: '',
+            acv: 0,
+            section: 'rats-mice',
+          })
         }
       }
+      console.log(`[Import] Total entries after Rats and Mice: ${indexes.byName.size}`)
     }
 
-    console.log(
-      `[Import] Loaded ${indexes.byName.size} BURC entries (${indexes.byOracleNumber.size} with Oracle numbers)`
-    )
+    console.log(`[Import] Loaded ${indexes.byName.size} BURC entries (${indexes.byOracleNumber.size} with Oracle numbers)`)
   } catch (error) {
     console.error('[Import] Error parsing BURC file:', error)
   }
@@ -198,30 +200,65 @@ function determineBURCStatus(
   oracleNumber: string,
   burcIndexes: BURCIndexes
 ): { status: string; category: string | null } {
-  // Try to find by Oracle number first
+  // Try to find by Oracle number first (exact match)
   if (oracleNumber) {
     const byOracle = burcIndexes.byOracleNumber.get(oracleNumber)
     if (byOracle) {
-      const status = mapBURCSectionToStatus(byOracle.section)
+      const status = mapBURCSectionToStatus(byOracle.section, byOracle.forecastCategory)
       return { status, category: byOracle.section }
+    }
+
+    // Try base number without trailing letters (e.g., "545891" matches "545891a")
+    const baseNumber = oracleNumber.replace(/[a-zA-Z]+$/, '')
+    if (baseNumber !== oracleNumber) {
+      const byBase = burcIndexes.byOracleNumber.get(baseNumber)
+      if (byBase) {
+        const status = mapBURCSectionToStatus(byBase.section, byBase.forecastCategory)
+        return { status, category: byBase.section }
+      }
+    }
+
+    // Also try finding BURC entries that start with this Oracle number (for suffix matching)
+    for (const [key, entry] of burcIndexes.byOracleNumber) {
+      const keyBase = key.replace(/[a-zA-Z]+$/, '')
+      if (keyBase === oracleNumber || keyBase === baseNumber) {
+        const status = mapBURCSectionToStatus(entry.section, entry.forecastCategory)
+        return { status, category: entry.section }
+      }
     }
   }
 
-  // Try to find by opportunity name
+  // Try to find by opportunity name (exact)
   const byName = burcIndexes.byName.get(optyName.toLowerCase())
   if (byName) {
-    const status = mapBURCSectionToStatus(byName.section)
+    const status = mapBURCSectionToStatus(byName.section, byName.forecastCategory)
     return { status, category: byName.section }
+  }
+
+  // Try partial name matching
+  const optyNameLower = optyName.toLowerCase()
+  for (const [key, entry] of burcIndexes.byName) {
+    if (optyNameLower.includes(key) || key.includes(optyNameLower)) {
+      const status = mapBURCSectionToStatus(entry.section, entry.forecastCategory)
+      return { status, category: entry.section }
+    }
   }
 
   return { status: 'not-in-burc', category: null }
 }
 
-function mapBURCSectionToStatus(section: string): string {
+function mapBURCSectionToStatus(section: string, forecastCategory?: string): string {
+  // Check forecast category for Best Case/Backlog determination
+  const fcLower = (forecastCategory || '').toLowerCase()
+
   switch (section) {
     case 'best-case':
+    case 'rats-mice':
+      // Rats & Mice and Best Case items - check forecast category
+      if (fcLower.includes('backlog')) return 'backlog-green'
       return 'best-case'
     case 'dial2-green':
+      if (fcLower.includes('best case')) return 'best-case'
       return 'backlog-green'
     case 'dial2-yellow':
       return 'backlog-yellow'
@@ -358,7 +395,13 @@ async function importPipelineData() {
 
   console.log(`Found header row at index ${headerRow}`)
 
-  const getColIndex = (name: string) => headers.indexOf(name)
+  // Column names may have arrows (↑) or other suffixes - use partial matching
+  const getColIndex = (name: string) => {
+    const exactIndex = headers.indexOf(name)
+    if (exactIndex !== -1) return exactIndex
+    // Try partial match (column name starts with our search term)
+    return headers.findIndex(h => h.startsWith(name) || h.includes(name))
+  }
 
   const opportunities: Record<string, unknown>[] = []
   let idCounter = 1
@@ -370,7 +413,7 @@ async function importPipelineData() {
     const accountName = String(row[getColIndex('Account Name')] || '').trim()
     if (!accountName) continue
 
-    const opportunityName = String(row[getColIndex('Opty Name')] || '').trim()
+    const opportunityName = String(row[getColIndex('Opportunity Name')] || '').trim()
     const oracleQuoteNumber = String(row[getColIndex('Oracle Quote Number')] || '').trim()
 
     // Get BURC status
