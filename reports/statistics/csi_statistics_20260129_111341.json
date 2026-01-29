@@ -1,0 +1,266 @@
+{
+  "timestamp": "20260129_111341",
+  "period": "Q4 25",
+  "n_clients": 13,
+  "power_analysis": {
+    "n": 13,
+    "alpha": 0.05,
+    "power": 0.8,
+    "min_detectable_d": 1.1453711397686954,
+    "interpretation": "With n=13, can detect Cohen's d >= 1.15 at alpha=0.05, power=0.8"
+  },
+  "correlations": {
+    "Avg Resolution Time": {
+      "rho": -0.7378647873726218,
+      "p_value": 0.2621352126273781,
+      "ci_lower": -0.6133152837078693,
+      "ci_upper": 0.82699449199654,
+      "n": 4,
+      "significant": false
+    },
+    "Open Cases": {
+      "rho": -0.7378647873726218,
+      "p_value": 0.2621352126273781,
+      "ci_lower": -0.6070599784433054,
+      "ci_upper": 0.827705306506529,
+      "n": 4,
+      "significant": false
+    },
+    "Total Cases": {
+      "rho": -0.7378647873726218,
+      "p_value": 0.2621352126273781,
+      "ci_lower": -0.6127821697564602,
+      "ci_upper": 0.8262094877925743,
+      "n": 4,
+      "significant": false
+    },
+    "CLC Attendances": {
+      "rho": -0.34388777334318305,
+      "p_value": 0.2499393015697514,
+      "ci_lower": -0.14545876757921333,
+      "ci_upper": 0.3897990631763695,
+      "n": 13,
+      "significant": false
+    },
+    "Segmentation Events": {
+      "rho": 0.2518218940537893,
+      "p_value": 0.40655467280132696,
+      "ci_lower": -0.01592175865663052,
+      "ci_upper": 0.5419480583492893,
+      "n": 13,
+      "significant": false
+    },
+    "Meetings": {
+      "rho": -0.3583453954024933,
+      "p_value": 0.22925010890750444,
+      "ci_lower": -0.15182294030482005,
+      "ci_upper": 0.38624014825242037,
+      "n": 13,
+      "significant": false
+    },
+    "Total Engagement": {
+      "rho": -0.011396196399199705,
+      "p_value": 0.9705249288307112,
+      "ci_lower": -0.01622120546278482,
+      "ci_upper": 0.3824382316839407,
+      "n": 13,
+      "significant": false
+    }
+  },
+  "loocv": {
+    "accuracy": 0.8461538461538461,
+    "correct": 11,
+    "total": 13,
+    "ci_lower": 0.5776536898051745,
+    "ci_upper": 0.9567418216419188,
+    "predictions": [
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      1,
+      0,
+      1,
+      1,
+      0,
+      0
+    ],
+    "actuals": [
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      1,
+      1,
+      0,
+      1,
+      1,
+      0,
+      1
+    ]
+  },
+  "roc_v1": {
+    "model_name": "CSI v1",
+    "auc": 0.8571428571428572,
+    "ci_lower": 0.6,
+    "ci_upper": 1.0,
+    "interpretation": "good"
+  },
+  "roc_v2": {
+    "model_name": "CSI v2",
+    "auc": 1.0,
+    "ci_lower": 0.9999999999999999,
+    "ci_upper": 1.0,
+    "interpretation": "excellent"
+  },
+  "model_comparison": {
+    "v1_accuracy": 0.7692307692307693,
+    "v2_accuracy": 0.8461538461538461,
+    "v1_correct": 10,
+    "v2_correct": 11,
+    "total": 13,
+    "v1_wrong_v2_right": 1,
+    "v1_right_v2_wrong": 0,
+    "mcnemar_p_value": 1.0,
+    "significant_difference": false
+  },
+  "confusion_matrix": {
+    "true_positives": 4,
+    "true_negatives": 7,
+    "false_positives": 0,
+    "false_negatives": 2,
+    "sensitivity": 0.6666666666666666,
+    "specificity": 1.0,
+    "precision": 1.0,
+    "f1_score": 0.8,
+    "confusion_matrix": [
+      [
+        7,
+        0
+      ],
+      [
+        2,
+        4
+      ]
+    ]
+  },
+  "threshold_sensitivity": {
+    "resolution_time": [
+      {
+        "threshold": 100.0,
+        "n_above": 4,
+        "n_below": 0,
+        "nps_above": NaN,
+        "nps_below": NaN,
+        "nps_delta": NaN,
+        "cohens_d": NaN,
+        "effect_magnitude": "insufficient data",
+        "metric": "Avg Resolution Time"
+      },
+      {
+        "threshold": 200.0,
+        "n_above": 4,
+        "n_below": 0,
+        "nps_above": NaN,
+        "nps_below": NaN,
+        "nps_delta": NaN,
+        "cohens_d": NaN,
+        "effect_magnitude": "insufficient data",
+        "metric": "Avg Resolution Time"
+      },
+      {
+        "threshold": 300.0,
+        "n_above": 4,
+        "n_below": 0,
+        "nps_above": NaN,
+        "nps_below": NaN,
+        "nps_delta": NaN,
+        "cohens_d": NaN,
+        "effect_magnitude": "insufficient data",
+        "metric": "Avg Resolution Time"
+      },
+      {
+        "threshold": 400.0,
+        "n_above": 4,
+        "n_below": 0,
+        "nps_above": NaN,
+        "nps_below": NaN,
+        "nps_delta": NaN,
+        "cohens_d": NaN,
+        "effect_magnitude": "insufficient data",
+        "metric": "Avg Resolution Time"
+      },
+      {
+        "threshold": 500.0,
+        "n_above": 3,
+        "n_below": 1,
+        "nps_above": -51.51515151515151,
+        "nps_below": 0.0,
+        "nps_delta": -51.51515151515151,
+        "cohens_d": NaN,
+        "effect_magnitude": "insufficient data",
+        "metric": "Avg Resolution Time"
+      },
+      {
+        "threshold": 600.0,
+        "n_above": 3,
+        "n_below": 1,
+        "nps_above": -51.51515151515151,
+        "nps_below": 0.0,
+        "nps_delta": -51.51515151515151,
+        "cohens_d": NaN,
+        "effect_magnitude": "insufficient data",
+        "metric": "Avg Resolution Time"
+      },
+      {
+        "threshold": 700.0,
+        "n_above": 3,
+        "n_below": 1,
+        "nps_above": -51.51515151515151,
+        "nps_below": 0.0,
+        "nps_delta": -51.51515151515151,
+        "cohens_d": NaN,
+        "effect_magnitude": "insufficient data",
+        "metric": "Avg Resolution Time"
+      },
+      {
+        "threshold": 800.0,
+        "n_above": 2,
+        "n_below": 2,
+        "nps_above": -77.27272727272727,
+        "nps_below": 0.0,
+        "nps_delta": -77.27272727272727,
+        "cohens_d": -3.3999999999999995,
+        "effect_magnitude": "large",
+        "metric": "Avg Resolution Time"
+      },
+      {
+        "threshold": 900.0,
+        "n_above": 2,
+        "n_below": 2,
+        "nps_above": -77.27272727272727,
+        "nps_below": 0.0,
+        "nps_delta": -77.27272727272727,
+        "cohens_d": -3.3999999999999995,
+        "effect_magnitude": "large",
+        "metric": "Avg Resolution Time"
+      },
+      {
+        "threshold": 1000.0,
+        "n_above": 1,
+        "n_below": 3,
+        "nps_above": -54.54545454545454,
+        "nps_below": -33.333333333333336,
+        "nps_delta": -21.212121212121204,
+        "cohens_d": NaN,
+        "effect_magnitude": "insufficient data",
+        "metric": "Avg Resolution Time"
+      }
+    ]
+  }
+}

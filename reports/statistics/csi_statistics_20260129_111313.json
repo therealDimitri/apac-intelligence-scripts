@@ -1,0 +1,19 @@
+{
+  "timestamp": "20260129_111313",
+  "period": "Q4 25",
+  "n_clients": 13,
+  "power_analysis": {
+    "n": 13,
+    "alpha": 0.05,
+    "power": 0.8,
+    "min_detectable_d": 1.1453711397686954,
+    "interpretation": "With n=13, can detect Cohen's d >= 1.15 at alpha=0.05, power=0.8"
+  },
+  "correlations": {
+    "Avg Resolution Time": {
+      "rho": -0.7378647873726218,
+      "p_value": 0.2621352126273781,
+      "ci_lower": -0.6179163204790308,
+      "ci_upper": 0.8279905996475675,
+      "n": 4,
+      "significant": 
