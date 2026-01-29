@@ -2,22 +2,86 @@
 Data extraction module for CSI Statistical Analysis.
 
 Extracts data from Supabase and builds unified client metrics DataFrame.
+Uses client_name_aliases table for proper cross-table client name matching.
 """
 
 import os
 import pandas as pd
 import numpy as np
-from typing import Optional
+from typing import Optional, Dict
 from supabase import create_client, Client
 
 # Supabase configuration
 SUPABASE_URL = os.getenv('SUPABASE_URL', 'https://usoyxsunetvxdjdglkmn.supabase.co')
 SUPABASE_KEY = os.getenv('SUPABASE_KEY', 'sb_secret_tg9qhHtwhKS0rPe_FUgzKA_nOyqLAas')
 
+# Global client name alias cache
+_client_alias_cache: Dict[str, str] = {}
+
 
 def get_supabase() -> Client:
     """Get Supabase client instance."""
     return create_client(SUPABASE_URL, SUPABASE_KEY)
+
+
+def extract_client_aliases() -> Dict[str, str]:
+    """
+    Extract client name aliases from Supabase.
+
+    Returns:
+        Dictionary mapping display_name -> canonical_name for all active aliases.
+    """
+    global _client_alias_cache
+
+    if _client_alias_cache:
+        return _client_alias_cache
+
+    supabase = get_supabase()
+    response = supabase.table('client_name_aliases').select(
+        'display_name, canonical_name'
+    ).eq('is_active', True).execute()
+
+    aliases = {}
+    for row in response.data:
+        display = row.get('display_name', '').strip()
+        canonical = row.get('canonical_name', '').strip()
+        if display and canonical:
+            aliases[display] = canonical
+
+    _client_alias_cache = aliases
+    return aliases
+
+
+def normalize_client_name(name: str, aliases: Dict[str, str] = None) -> str:
+    """
+    Normalize a client name using aliases table.
+
+    Args:
+        name: Raw client name from any data source
+        aliases: Optional pre-fetched alias dictionary
+
+    Returns:
+        Canonical client name (or original if no alias found)
+    """
+    if not name:
+        return name
+
+    name = str(name).strip()
+
+    if aliases is None:
+        aliases = extract_client_aliases()
+
+    # Check for exact alias match
+    if name in aliases:
+        return aliases[name]
+
+    # Check for case-insensitive match
+    name_lower = name.lower()
+    for display, canonical in aliases.items():
+        if display.lower() == name_lower:
+            return canonical
+
+    return name
 
 
 def extract_nps(period: Optional[str] = None) -> pd.DataFrame:
@@ -29,6 +93,7 @@ def extract_nps(period: Optional[str] = None) -> pd.DataFrame:
 
     Returns:
         DataFrame with columns: client_name, score, feedback, period, created_at
+        Client names are normalized using client_name_aliases.
     """
     supabase = get_supabase()
     query = supabase.table('nps_responses').select('*')
@@ -42,6 +107,13 @@ def extract_nps(period: Optional[str] = None) -> pd.DataFrame:
     if len(df) > 0:
         df['score'] = pd.to_numeric(df['score'], errors='coerce')
 
+        # Normalize client names using aliases table
+        if 'client_name' in df.columns:
+            aliases = extract_client_aliases()
+            df['client_name'] = df['client_name'].apply(
+                lambda x: normalize_client_name(x, aliases)
+            )
+
     return df
 
 
@@ -51,6 +123,7 @@ def extract_cases() -> pd.DataFrame:
 
     Returns:
         DataFrame with case-level data including resolution duration.
+        Client names are normalized using client_name_aliases for cross-table matching.
     """
     supabase = get_supabase()
     response = supabase.table('support_case_details').select('*').execute()
@@ -61,6 +134,14 @@ def extract_cases() -> pd.DataFrame:
         if 'resolution_duration_seconds' in df.columns:
             df['resolution_hours'] = df['resolution_duration_seconds'] / 3600
 
+        # Normalize client names using aliases table
+        aliases = extract_client_aliases()
+        if 'client_name' in df.columns:
+            df['client_name_raw'] = df['client_name']  # Keep original
+            df['client_name'] = df['client_name'].apply(
+                lambda x: normalize_client_name(x, aliases)
+            )
+
     return df
 
 
@@ -70,10 +151,19 @@ def extract_sla() -> pd.DataFrame:
 
     Returns:
         DataFrame with point-in-time SLA metrics per client.
+        Client names are normalized using client_name_aliases.
     """
     supabase = get_supabase()
     response = supabase.table('support_sla_latest').select('*').execute()
-    return pd.DataFrame(response.data)
+    df = pd.DataFrame(response.data)
+
+    if len(df) > 0 and 'client_name' in df.columns:
+        aliases = extract_client_aliases()
+        df['client_name'] = df['client_name'].apply(
+            lambda x: normalize_client_name(x, aliases)
+        )
+
+    return df
 
 
 def extract_events() -> pd.DataFrame:
@@ -82,10 +172,19 @@ def extract_events() -> pd.DataFrame:
 
     Returns:
         DataFrame with segmentation event records.
+        Client names are normalized using client_name_aliases.
     """
     supabase = get_supabase()
     response = supabase.table('segmentation_events').select('*').execute()
-    return pd.DataFrame(response.data)
+    df = pd.DataFrame(response.data)
+
+    if len(df) > 0 and 'client_name' in df.columns:
+        aliases = extract_client_aliases()
+        df['client_name'] = df['client_name'].apply(
+            lambda x: normalize_client_name(x, aliases)
+        )
+
+    return df
 
 
 def extract_meetings() -> pd.DataFrame:
@@ -94,10 +193,22 @@ def extract_meetings() -> pd.DataFrame:
 
     Returns:
         DataFrame with meeting records.
+        Client names are normalized using client_name_aliases.
     """
     supabase = get_supabase()
     response = supabase.table('unified_meetings').select('*').execute()
-    return pd.DataFrame(response.data)
+    df = pd.DataFrame(response.data)
+
+    if len(df) > 0:
+        aliases = extract_client_aliases()
+        # Check for client_name or client column
+        for col in ['client_name', 'client']:
+            if col in df.columns:
+                df[col] = df[col].apply(
+                    lambda x: normalize_client_name(x, aliases)
+                )
+
+    return df
 
 
 def extract_clc() -> pd.DataFrame:
@@ -106,12 +217,21 @@ def extract_clc() -> pd.DataFrame:
 
     Returns:
         DataFrame with CLC attendance and feedback data.
+        Client names are normalized using client_name_aliases.
     """
     supabase = get_supabase()
     response = supabase.table('clc_event_attendees').select(
         '*, clc_events(event_name, event_year, event_date)'
     ).eq('is_internal', False).execute()
-    return pd.DataFrame(response.data)
+    df = pd.DataFrame(response.data)
+
+    if len(df) > 0 and 'client_name' in df.columns:
+        aliases = extract_client_aliases()
+        df['client_name'] = df['client_name'].apply(
+            lambda x: normalize_client_name(x, aliases)
+        )
+
+    return df
 
 
 def calculate_nps_score(scores: pd.Series) -> float:
