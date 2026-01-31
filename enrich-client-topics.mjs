@@ -11,21 +11,26 @@ const supabase = createClient(
 )
 
 const sampleTopics = [
-  'clinical documentation',
-  'interoperability',
-  'patient engagement',
-  'revenue cycle',
-  'population health',
-  'telehealth',
-  'medication management',
-  'care coordination',
-  'analytics',
-  'workflow optimisation',
-  'EHR modernisation',
-  'data migration',
-  'user training',
-  'system integration',
-  'reporting requirements',
+  // Clinical operations
+  'clinical documentation', 'medication management', 'clinical decision support',
+  'nursing workflows', 'physician documentation', 'care coordination',
+  'order management', 'results review', 'discharge planning',
+  // Technology
+  'system integration', 'interoperability', 'data migration', 'upgrade planning',
+  'interface development', 'API integration', 'mobile access', 'cloud migration',
+  'security compliance', 'disaster recovery',
+  // Business
+  'revenue cycle', 'reporting requirements', 'compliance', 'regulatory',
+  'value-based care', 'population health', 'quality metrics', 'cost reduction',
+  'operational efficiency', 'resource optimisation',
+  // Engagement
+  'workflow optimisation', 'patient engagement', 'user training',
+  'adoption challenges', 'change management', 'go-live support',
+  'optimisation review', 'satisfaction improvement',
+  // Strategic
+  'strategic planning', 'roadmap discussion', 'contract renewal',
+  'expansion planning', 'partnership opportunities', 'digital transformation',
+  'innovation initiatives', 'future state vision',
 ]
 
 async function enrichTopics() {
@@ -69,7 +74,7 @@ async function enrichTopics() {
     .gte('meeting_date', ninetyDaysAgo)
     .is('topics', null)
     .order('meeting_date', { ascending: false })
-    .limit(50)
+    .limit(150)
 
   if (!meetingsWithoutTopics?.length) {
     console.log('\nNo meetings without topics found. Data is already enriched.')
