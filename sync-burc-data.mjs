@@ -372,8 +372,9 @@ async function syncClientMaintenance(client, workbook) {
     const firstCol = row[0];
 
     // Check if this is a category header
-    if (['Run Rate', 'Best Case', 'Best Cast', 'Pipeline', 'Business Case', 'Backlog'].includes(firstCol)) {
-      currentCategory = firstCol === 'Best Cast' ? 'Best Case' : firstCol;
+    // Note: Excel has both "Bus Case" and "Business Case" - normalise to "Business Case"
+    if (['Run Rate', 'Best Case', 'Pipeline', 'Business Case', 'Bus Case', 'Backlog', 'Lost'].includes(firstCol)) {
+      currentCategory = firstCol === 'Bus Case' ? 'Business Case' : firstCol;
       continue;
     }
 
