@@ -126,36 +126,28 @@ const wedgeTemplates = {
 async function seed() {
   console.log('Fetching products for value wedges...')
 
-  // Get sales briefs from key product families
-  const { data: products, error: fetchError } = await supabase
-    .from('product_catalog')
-    .select('id, title, product_family')
-    .in('product_family', ['Sunrise', 'dbMotion', 'TouchWorks', 'Paragon'])
-    .eq('content_type', 'sales_brief')
-    .eq('is_active', true)
+  // Get products from key families - one representative per family for wedges
+  const targetFamilies = ['Sunrise', 'dbMotion', 'TouchWorks', 'Paragon']
+  const products = []
 
-  if (fetchError) {
-    console.error('Error fetching products:', fetchError.message)
-    process.exit(1)
-  }
-
-  if (!products?.length) {
-    console.log('No sales brief products found for target families')
-
-    // Fall back to any products from these families
-    const { data: fallback } = await supabase
+  for (const family of targetFamilies) {
+    // Get up to 3 products per family to have wedges
+    const { data: familyProducts } = await supabase
       .from('product_catalog')
       .select('id, title, product_family')
-      .in('product_family', ['Sunrise', 'dbMotion', 'TouchWorks', 'Paragon'])
+      .eq('product_family', family)
       .eq('is_active', true)
-      .limit(10)
+      .limit(3)
 
-    if (!fallback?.length) {
-      console.log('No products found at all for target families')
-      return
+    if (familyProducts?.length) {
+      products.push(...familyProducts)
+      console.log(`  ${family}: ${familyProducts.length} products`)
     }
+  }
 
-    products.push(...fallback)
+  if (!products.length) {
+    console.log('No products found for target families')
+    return
   }
 
   console.log(`Found ${products.length} products to add wedges for`)
