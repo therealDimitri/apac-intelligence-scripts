@@ -28,8 +28,8 @@ const CLIENT_MAPPING = {
   'Parkway (Churned)': null, // Churned client
 }
 
-// AUD to USD conversion rate (approximate)
-const AUD_TO_USD = 0.65
+// No currency conversion - use data as-is from BURC
+const CURRENCY_MULTIPLIER = 1.0
 
 async function updateClientARRFromBURC() {
   console.log('=== Updating client_arr from BURC Maintenance Data ===\n')
@@ -94,8 +94,8 @@ async function updateClientARRFromBURC() {
       continue
     }
 
-    // Convert AUD to USD
-    const arrUSD = Math.round(burcTotal * AUD_TO_USD)
+    // Use value as-is (no currency conversion)
+    const arrValue = Math.round(burcTotal * CURRENCY_MULTIPLIER)
 
     // Find the client_arr record
     const arrRecord = currentARR.find(r => r.client_name === arrName)
@@ -108,7 +108,7 @@ async function updateClientARRFromBURC() {
     const { error: updateError } = await supabase
       .from('client_arr')
       .update({
-        arr_usd: arrUSD,
+        arr_usd: arrValue,
         currency: 'AUD',
         notes: `Updated from BURC 2026 data. Original AUD: ${burcTotal.toLocaleString()}`,
         updated_at: new Date().toISOString()
@@ -119,10 +119,10 @@ async function updateClientARRFromBURC() {
       console.log(`❌ Error updating ${arrName}: ${updateError.message}`)
     } else {
       const oldValue = arrRecord.arr_usd
-      const change = arrUSD - oldValue
+      const change = arrValue - oldValue
       const changePercent = oldValue > 0 ? ((change / oldValue) * 100).toFixed(1) : 'N/A'
       console.log(`✅ Updated ${arrName}:`)
-      console.log(`   Old: USD ${oldValue.toLocaleString()} → New: USD ${arrUSD.toLocaleString()} (${change >= 0 ? '+' : ''}${change.toLocaleString()}, ${changePercent}%)`)
+      console.log(`   Old: USD ${oldValue.toLocaleString()} → New: USD ${arrValue.toLocaleString()} (${change >= 0 ? '+' : ''}${change.toLocaleString()}, ${changePercent}%)`)
       updatedCount++
     }
   }
