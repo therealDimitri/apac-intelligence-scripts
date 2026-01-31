@@ -350,10 +350,11 @@ async function syncClientMaintenance(client, workbook) {
   await client.query('DELETE FROM burc_client_maintenance');
 
   let currentCategory = null;
+  let inDataSection = false;
   let insertCount = 0;
 
-  // Client name mapping
-  const clientNames = {
+  // Client code to full name mapping (all known clients in pivot table)
+  const CLIENT_NAMES = {
     'AWH': 'Albury Wodonga Health',
     'BWH': 'Barwon Health',
     'EPH': 'Epworth Healthcare',
@@ -364,52 +365,73 @@ async function syncClientMaintenance(client, workbook) {
     'RVEEH': 'Royal Victorian Eye & Ear',
     'SA Health': 'SA Health',
     'WA Health': 'WA Health',
-    'SLMC': 'St Luke\'s Medical Centre',
+    'SLMC': "St Luke's Medical Centre",
+    'Sing Health': 'Sing Health',
+    'Waikato': 'Waikato',
+    'Western Health': 'Western Health',
+    'GRMC': 'GRMC',
     'Parkway': 'Parkway (Churned)'
   };
 
-  for (const row of data) {
+  // Category headers in the data section
+  const CATEGORY_HEADERS = ['Best Case', 'Pipeline', 'Backlog', 'Bus Case', 'Business Case', 'Lost'];
+
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i];
     const firstCol = row[0];
 
-    // Check if this is a category header
-    // Note: Excel has both "Bus Case" and "Business Case" - normalise to "Business Case"
-    if (['Run Rate', 'Best Case', 'Pipeline', 'Business Case', 'Bus Case', 'Backlog', 'Lost'].includes(firstCol)) {
-      currentCategory = firstCol === 'Bus Case' ? 'Business Case' : firstCol;
+    if (!firstCol) continue;
+    const trimmed = String(firstCol).trim();
+
+    // Skip until we hit "Row Labels" which marks the start of the data section
+    // (Rows before this are summary totals that we skip)
+    if (trimmed === 'Row Labels') {
+      inDataSection = true;
       continue;
     }
 
-    // Skip header rows and empty rows
-    if (!firstCol || firstCol === 'Row Labels' || !currentCategory) continue;
+    // Only process rows in the data section
+    if (!inDataSection) continue;
 
-    // This is a client row
-    const clientCode = firstCol;
-    const clientName = clientNames[clientCode] || clientCode;
-
-    // Extract monthly values (columns 1-12)
-    const monthlyValues = [];
-    let annualTotal = 0;
-    for (let i = 1; i <= 12; i++) {
-      const val = row[i] || 0;
-      monthlyValues.push(val);
-      annualTotal += val;
+    // Check if this is a category header
+    if (CATEGORY_HEADERS.includes(trimmed)) {
+      currentCategory = trimmed === 'Bus Case' ? 'Business Case' : trimmed;
+      continue;
     }
 
-    if (annualTotal > 0) {
-      await client.query(`
-        INSERT INTO burc_client_maintenance
-        (client_code, client_name, category, jan, feb, mar, apr, may, jun, jul, aug, sep, oct, nov, dec, annual_total)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-        ON CONFLICT (client_code, category) DO UPDATE SET
-          client_name = EXCLUDED.client_name,
-          jan = EXCLUDED.jan, feb = EXCLUDED.feb, mar = EXCLUDED.mar,
-          apr = EXCLUDED.apr, may = EXCLUDED.may, jun = EXCLUDED.jun,
-          jul = EXCLUDED.jul, aug = EXCLUDED.aug, sep = EXCLUDED.sep,
-          oct = EXCLUDED.oct, nov = EXCLUDED.nov, dec = EXCLUDED.dec,
-          annual_total = EXCLUDED.annual_total,
-          updated_at = NOW()
-      `, [clientCode, clientName, currentCategory, ...monthlyValues, annualTotal]);
-      insertCount++;
+    // Skip if no category set yet
+    if (!currentCategory) continue;
+
+    // Only process known client codes (parent rows, not detail sub-items)
+    if (CLIENT_NAMES[trimmed]) {
+      // Calculate annual from columns B-M (indices 1-12)
+      const monthlyValues = [];
+      let annualTotal = 0;
+      for (let c = 1; c <= 12; c++) {
+        const val = Number(row[c]) || 0;
+        monthlyValues.push(val);
+        annualTotal += val;
+      }
+
+      // Allow negative totals (e.g., "Lost" category has negative revenue)
+      if (annualTotal !== 0) {
+        await client.query(`
+          INSERT INTO burc_client_maintenance
+          (client_code, client_name, category, jan, feb, mar, apr, may, jun, jul, aug, sep, oct, nov, dec, annual_total)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+          ON CONFLICT (client_code, category) DO UPDATE SET
+            client_name = EXCLUDED.client_name,
+            jan = EXCLUDED.jan, feb = EXCLUDED.feb, mar = EXCLUDED.mar,
+            apr = EXCLUDED.apr, may = EXCLUDED.may, jun = EXCLUDED.jun,
+            jul = EXCLUDED.jul, aug = EXCLUDED.aug, sep = EXCLUDED.sep,
+            oct = EXCLUDED.oct, nov = EXCLUDED.nov, dec = EXCLUDED.dec,
+            annual_total = EXCLUDED.annual_total,
+            updated_at = NOW()
+        `, [trimmed, CLIENT_NAMES[trimmed], currentCategory, ...monthlyValues, annualTotal]);
+        insertCount++;
+      }
     }
+    // Skip detail rows (sub-items under each client) - they're not in CLIENT_NAMES
   }
 
   console.log(`   ✅ ${insertCount} client maintenance entries synced`);

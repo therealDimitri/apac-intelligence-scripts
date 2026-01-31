@@ -8,11 +8,12 @@ const supabase = createClient(
 )
 
 // Mapping from BURC client names to client_arr client names
+// Verified against actual client_arr names on 2026-01-31
 const CLIENT_MAPPING = {
   'SA Health': 'Minister for Health aka South Australia Health',
   'Sing Health': 'Singapore Health Services Pte Ltd',
-  'Grampians Health Alliance': 'Grampians Health Alliance',
-  'WA Health': 'Western Australia Department Of Health',
+  'Grampians Health Alliance': 'Grampians Health',  // client_arr uses shorter name
+  'WA Health': 'WA Health',  // exact match in client_arr
   "St Luke's Medical Centre": 'St Luke\'s Medical Center Global City Inc',
   'GRMC': 'GRMC (Guam Regional Medical Centre)',
   'Epworth Healthcare': 'Epworth Healthcare',
@@ -20,10 +21,10 @@ const CLIENT_MAPPING = {
   'Barwon Health': 'Barwon Health Australia',
   'Western Health': 'Western Health',
   'Royal Victorian Eye & Ear': 'The Royal Victorian Eye and Ear Hospital',
-  'GHA Regional': 'Gippsland Health Alliance',
-  'NCS/MinDef': null,              // Singapore - Not in current client_arr
-  'Albury Wodonga Health': null,   // Not in current client_arr
-  'Mount Alvernia Hospital': null, // Singapore - Not in current client_arr
+  'GHA Regional': 'Gippsland Health Alliance (GHA)',  // client_arr includes (GHA)
+  'NCS/MinDef': 'NCS Pte Ltd',  // Singapore defence contract
+  'Albury Wodonga Health': 'Albury Wodonga Health',  // exact match
+  'Mount Alvernia Hospital': 'Mount Alvernia Hospital',  // exact match
   'Bus Case': null,        // Not a real client
   'Parkway (Churned)': null, // Churned client
 }
