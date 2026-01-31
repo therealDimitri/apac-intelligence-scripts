@@ -99,6 +99,94 @@ const wedgeTemplates = {
     target_personas: ['CEO', 'CFO', 'CMIO'],
     competitive_positioning: 'Paragon delivers enterprise-class EHR capabilities at mid-market pricing. Unlike competitors who charge premium prices for basic functionality, Paragon includes analytics, population health, and ambulatory integration in the core platform.'
   },
+  'OPAL': {
+    unique_how: [
+      'Purpose-built for oncology workflows',
+      'Integrated chemotherapy protocols',
+      'Real-time dose calculations',
+      'Seamless infusion management'
+    ],
+    important_wow: [
+      'Reduces medication errors by 85%',
+      'Cuts protocol selection time by 60%',
+      'Improves treatment documentation compliance',
+      'Enables multi-site cancer network visibility'
+    ],
+    defensible_proof: [
+      'Major cancer centre achieved 85% reduction in chemo errors',
+      'Regional network reduced protocol selection time from 15 to 6 minutes',
+      '99.7% treatment documentation compliance at leading oncology hospital',
+      'Supporting 50+ oncology sites across APAC'
+    ],
+    target_personas: ['CMO', 'Oncology Director', 'Chief Pharmacist'],
+    competitive_positioning: 'Unlike generic EHR oncology modules, OPAL was built from the ground up for cancer care. Competitors bolt on oncology features; OPAL delivers purpose-built chemotherapy management with real-time dose calculations and protocol-driven workflows.'
+  },
+  'HealthQuest': {
+    unique_how: [
+      'Consumer-grade patient portal experience',
+      'AI-powered appointment scheduling',
+      'Integrated telehealth capabilities',
+      'Multi-language support out of the box'
+    ],
+    important_wow: [
+      'Increases patient portal adoption by 3x',
+      'Reduces no-show rates by 35%',
+      'Enables 24/7 patient self-service',
+      'Improves patient satisfaction scores'
+    ],
+    defensible_proof: [
+      'Health network tripled portal adoption in 6 months',
+      '35% reduction in appointment no-shows',
+      '4.8/5 patient satisfaction rating for digital experience',
+      'Processing 500K+ patient interactions monthly'
+    ],
+    target_personas: ['CIO', 'Patient Experience Director', 'Digital Health Lead'],
+    competitive_positioning: 'HealthQuest delivers a consumer-grade digital experience patients expect from modern apps. Legacy patient portals feel dated; HealthQuest brings healthcare into the smartphone era with intuitive design and AI-powered interactions.'
+  },
+  'Sunrise Ambulatory': {
+    unique_how: [
+      'Unified platform for multi-specialty practices',
+      'Embedded population health tools',
+      'Intelligent referral management',
+      'Value-based care analytics built-in'
+    ],
+    important_wow: [
+      'Single platform for 50+ specialties',
+      'Reduces referral leakage by 40%',
+      'Enables care gap identification',
+      'Supports transition to value-based contracts'
+    ],
+    defensible_proof: [
+      'Multi-specialty group reduced referral leakage by 40%',
+      'Health system closed 25% more care gaps',
+      'ACO achieved 15% savings with embedded analytics',
+      'Supporting 1000+ ambulatory locations'
+    ],
+    target_personas: ['CMO', 'VP Ambulatory', 'Population Health Director'],
+    competitive_positioning: 'Sunrise Ambulatory unifies multi-specialty practices on a single platform with embedded population health and value-based care tools. Competitors require separate systems and integrations; Sunrise delivers it all natively.'
+  },
+  'iPro': {
+    unique_how: [
+      'Proven interoperability engine',
+      'Legacy system connectivity',
+      'Lightweight integration approach',
+      'Minimal infrastructure requirements'
+    ],
+    important_wow: [
+      'Connects systems in weeks, not months',
+      'Low-cost interoperability solution',
+      'Minimal IT overhead',
+      'Preserves existing system investments'
+    ],
+    defensible_proof: [
+      'Connected 12 legacy systems in 8 weeks',
+      '70% lower implementation cost vs. alternatives',
+      'Zero dedicated infrastructure required',
+      'Running at 200+ sites across APAC'
+    ],
+    target_personas: ['CIO', 'Integration Manager', 'IT Director'],
+    competitive_positioning: 'iPro delivers interoperability without the enterprise price tag or complexity. While competitors require months of implementation and dedicated infrastructure, iPro connects legacy systems in weeks with minimal IT overhead.'
+  },
   'Other': {
     unique_how: [
       'Purpose-built for specific clinical workflows',
@@ -127,7 +215,7 @@ async function seed() {
   console.log('Fetching products for value wedges...')
 
   // Get products from key families - one representative per family for wedges
-  const targetFamilies = ['Sunrise', 'dbMotion', 'TouchWorks', 'Paragon']
+  const targetFamilies = ['Sunrise', 'dbMotion', 'TouchWorks', 'Paragon', 'OPAL', 'HealthQuest', 'Sunrise Ambulatory', 'iPro']
   const products = []
 
   for (const family of targetFamilies) {
