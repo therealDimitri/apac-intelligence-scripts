@@ -412,14 +412,15 @@ async function syncBusinessCases() {
         const cogs = parseCurrency(row[8])
         const probability = row[9] || 0.5
 
-        // Skip empty rows, backlog headers, or lost opportunities
-        if (!clientName || clientName === 'Backlog' || status === 'Lost') continue
+        // Skip empty rows, backlog headers, lost opportunities, or maintenance run-rates
+        // Note: "Backlog" status in SW/PS/Maint/HW sheets = maintenance run-rates, not Dial 2 Backlog
+        // Actual Dial 2 Backlog items are synced via sync-pipeline-and-attrition.mjs
+        if (!clientName || clientName === 'Backlog' || status === 'Lost' || status === 'Backlog') continue
         if (!revenueUSD || revenueUSD === 0) continue
 
         // Map status to forecast category
         let forecastCategory = 'Pipeline'
-        if (status === 'Backlog') forecastCategory = 'Backlog'
-        else if (status === 'Best Case') forecastCategory = 'Best Case'
+        if (status === 'Best Case') forecastCategory = 'Best Case'
         else if (status === 'Business Case') forecastCategory = 'Business Case'
 
         // Check if this opportunity already exists (aggregate by client + project)

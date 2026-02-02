@@ -146,8 +146,9 @@ async function syncPipelineData() {
     const hw = parseCurrency(row[11])
 
     // R&M items use category-based sections (no color in Excel)
-    // Map category to section: best case -> green, business case -> yellow, pipeline -> pipeline
-    const sectionColor = category === 'Best Case' ? 'green' :
+    // Map category to section: backlog/best case -> green, business case -> yellow, pipeline -> pipeline
+    const sectionColor = category === 'Backlog' ? 'green' :
+                         category === 'Best Case' ? 'green' :
                          category === 'Business Case' ? 'yellow' : 'pipeline'
     const inForecast = ['green', 'yellow'].includes(sectionColor)
 
@@ -453,6 +454,7 @@ function extractClientName(oppName) {
 // Helper: Normalise forecast category
 function normaliseForecast(fcast) {
   const f = fcast.toLowerCase()
+  if (f.includes('backlog')) return 'Backlog'
   if (f.includes('best')) return 'Best Case'
   if (f.includes('bus')) return 'Business Case'
   if (f.includes('lost') || f.includes('closed')) return 'EXCLUDE' // Lost/closed deals
