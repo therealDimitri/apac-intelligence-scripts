@@ -732,11 +732,21 @@ async function syncClientMaintenance(workbook) {
 
   const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-  await supabase.from('burc_client_maintenance').delete().neq('client_code', '');
+  // Delete existing records - use a condition that matches all records
+  const { error: deleteError } = await supabase
+    .from('burc_client_maintenance')
+    .delete()
+    .not('client_code', 'is', null);
+
+  if (deleteError) {
+    console.log('   ⚠️ Delete error:', deleteError.message);
+  }
 
   let currentCategory = null;
   const records = [];
 
+  // Known client codes - these are parent-level entries in the Excel hierarchy
+  // Child rows (like "Run Rate 25/26", "CPI - 5%") are detail breakdowns and should be skipped
   const clientNames = {
     'AWH': 'Albury Wodonga Health',
     'BWH': 'Barwon Health',
@@ -749,12 +759,20 @@ async function syncClientMaintenance(workbook) {
     'SA Health': 'SA Health',
     'WA Health': 'WA Health',
     'SLMC': "St Luke's Medical Centre",
-    'Parkway': 'Parkway (Churned)'
+    'Parkway': 'Parkway (Churned)',
+    'GRMC': 'Grafton Base Hospital',
+    'Western Health': 'Western Health',
+    'RBWH': 'Royal Brisbane Hospital',
+    'Lost': 'Lost Revenue'
   };
+
+  // Track seen combinations to handle any remaining duplicates
+  const seen = new Set();
 
   for (const row of data) {
     const firstCol = row[0];
 
+    // Detect category headers
     if (['Run Rate', 'Best Case', 'Best Cast', 'Pipeline', 'Business Case', 'Backlog'].includes(firstCol)) {
       currentCategory = firstCol === 'Best Cast' ? 'Best Case' : firstCol;
       continue;
@@ -762,8 +780,17 @@ async function syncClientMaintenance(workbook) {
 
     if (!firstCol || firstCol === 'Row Labels' || !currentCategory) continue;
 
+    // Only process known client codes - skip child detail rows
+    // Child rows are things like "Run Rate 25/26", "CPI - 5%", project names, etc.
+    if (!clientNames[firstCol]) continue;
+
     const clientCode = firstCol;
-    const clientName = clientNames[clientCode] || clientCode;
+    const clientName = clientNames[clientCode];
+
+    // Skip duplicates (same client+category combination)
+    const key = clientCode + '|' + currentCategory;
+    if (seen.has(key)) continue;
+    seen.add(key);
 
     const monthlyValues = [];
     let annualTotal = 0;
