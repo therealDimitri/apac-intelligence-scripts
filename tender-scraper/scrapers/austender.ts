@@ -21,44 +21,66 @@ export class AusTenderScraper extends BaseTenderScraper {
     try {
       // Navigate to Contract Notices search
       await page.goto(`${this.config.baseUrl}/Cn/Search`, {
-        waitUntil: 'domcontentloaded',
+        waitUntil: 'networkidle',
         timeout: this.config.timeout,
       })
 
-      await this.humanDelay(page)
+      await this.humanDelay(page, 2000, 3000)
 
-      // Check if we landed on the search page
-      const searchForm = await page.$('form')
-      if (!searchForm) {
-        await this.takeDebugScreenshot(page, 'no-search-form')
-        throw new Error('Search form not found')
+      // Wait for the search page content to load - look for specific elements
+      try {
+        await page.waitForSelector('h1:has-text("Contract Notices"), .step-indicator, .wizard-step', { timeout: 10000 })
+        console.log(`[${this.name}] Search page loaded`)
+      } catch {
+        // Page structure might be different, continue anyway
+        console.log(`[${this.name}] Continuing without specific page markers`)
       }
 
-      // Fill in search criteria
-      const keywordInput = await page.$('#KeywordSearch, input[name="KeywordSearch"], input[type="text"]')
-      if (keywordInput) {
+      // Take a debug screenshot to see current state
+      await this.takeDebugScreenshot(page, 'form-loaded')
+
+      // Find the visible keyword input - AusTender has multiple forms on page
+      // The main search form's keyword field should be visible
+      const keywordInput = await page.locator('input[name="Keyword"]:visible, input#Keyword:visible').first()
+
+      try {
+        await keywordInput.waitFor({ state: 'visible', timeout: 5000 })
+        await keywordInput.click()
+        await this.humanDelay(page, 300, 500)
         await keywordInput.fill(this.config.searchKeywords.join(' '))
-        console.log(`[${this.name}] Filled keyword search`)
+        console.log(`[${this.name}] Filled keyword search: ${this.config.searchKeywords.join(' ')}`)
+      } catch {
+        console.warn(`[${this.name}] Keyword input not found or not visible, proceeding without keywords`)
+        await this.takeDebugScreenshot(page, 'no-keyword-input')
       }
 
-      // Select Open status if dropdown exists
-      const statusSelect = await page.$('#Status, select[name="Status"]')
-      if (statusSelect) {
-        await statusSelect.selectOption({ label: 'Open' }).catch(() => {
-          statusSelect.selectOption('Open').catch(() => {})
-        })
+      // Select Current/Open status if radio button exists
+      const statusRadio = await page.$('input[name="Status"][value="Current"]:visible')
+      if (statusRadio) {
+        await statusRadio.check().catch(() => {})
+        console.log(`[${this.name}] Selected Current status`)
       }
 
-      // Submit search
-      const submitButton = await page.$(
-        'button[type="submit"], input[type="submit"], .search-button, #search-button'
-      )
-      if (submitButton) {
-        await submitButton.click()
-        await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {})
+      await this.humanDelay(page, 500, 1000)
+
+      // Find and click the visible search/submit button
+      // AusTender uses a blue button with magnifying glass icon
+      const searchButton = await page.locator('button[type="submit"]:visible, .btn-primary:visible').first()
+
+      try {
+        await searchButton.waitFor({ state: 'visible', timeout: 5000 })
+        await searchButton.click()
+        console.log(`[${this.name}] Clicked search button`)
+        await page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {})
+      } catch {
+        // Try pressing Enter as fallback
+        console.log(`[${this.name}] No visible search button, trying Enter key`)
+        await page.keyboard.press('Enter')
+        await page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {})
       }
 
       await this.humanDelay(page, 2000, 4000)
+      await this.takeDebugScreenshot(page, 'after-search')
 
       // Parse results from multiple possible structures
       let pageNum = 0
@@ -72,23 +94,49 @@ export class AusTenderScraper extends BaseTenderScraper {
 
         console.log(`[${this.name}] Found ${pageResults.length} tenders on page ${pageNum + 1}`)
 
-        // Check for next page
-        const nextButton = await page.$(
-          '.pagination .next:not(.disabled), a[rel="next"], .page-link:has-text("Next")'
-        )
-        if (!nextButton || pageResults.length === 0) {
+        if (pageResults.length === 0) {
           break
         }
 
-        await nextButton.click()
-        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {})
-        await this.humanDelay(page)
-        pageNum++
+        // Check for next page - only proceed if button exists AND is visible
+        try {
+          const nextLocator = page.locator(
+            '.pagination .next:not(.disabled), a[rel="next"], .page-link:has-text("Next"), a:has-text("Next")'
+          ).first()
+
+          const isVisible = await nextLocator.isVisible().catch(() => false)
+          if (!isVisible) {
+            console.log(`[${this.name}] No visible next button, done paginating`)
+            break
+          }
+
+          await nextLocator.click({ timeout: 5000 })
+          await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {})
+          await this.humanDelay(page)
+          pageNum++
+        } catch (navError) {
+          console.log(`[${this.name}] Pagination stopped: ${navError instanceof Error ? navError.message : 'unknown'}`)
+          break
+        }
       }
+
+      // Debug: Show first few titles
+      console.log(`[${this.name}] Sample titles found:`)
+      results.slice(0, 5).forEach((t, i) => {
+        console.log(`  ${i + 1}. "${t.title.substring(0, 80)}..."`)
+      })
 
       // Filter for healthcare-related tenders
       const healthcareTenders = results.filter(t => this.isHealthcareRelated(t.title, t.description))
       console.log(`[${this.name}] Total: ${results.length}, Healthcare-related: ${healthcareTenders.length}`)
+
+      // If few healthcare results, also show which ones matched
+      if (healthcareTenders.length > 0 && healthcareTenders.length <= 10) {
+        console.log(`[${this.name}] Matched tenders:`)
+        healthcareTenders.forEach((t, i) => {
+          console.log(`  ${i + 1}. ${t.tender_reference}: ${t.title.substring(0, 60)}`)
+        })
+      }
 
       return healthcareTenders
     } catch (error) {
@@ -101,24 +149,127 @@ export class AusTenderScraper extends BaseTenderScraper {
   private async parseResultsPage(page: Page): Promise<TenderResult[]> {
     const results: TenderResult[] = []
 
-    // Try table-based results
-    const tableRows = await page.$$('table tbody tr, .search-results tr')
+    // AusTender uses a distinct layout with agency name + details blocks
+    // Try multiple selector patterns
+
+    // Pattern 1: Standard table rows
+    const tableRows = await page.$$('table tbody tr:not(:empty)')
     if (tableRows.length > 0) {
+      console.log(`[${this.name}] Found ${tableRows.length} table rows`)
       for (const row of tableRows) {
         const tender = await this.parseTableRow(row)
         if (tender) results.push(tender)
       }
-      return results
+      if (results.length > 0) return results
     }
 
-    // Try list-based results
+    // Pattern 2: Contract Notice list items (AusTender 2024+ layout)
+    // Look for links containing "/Cn/Show/" which are individual tender links
+    const tenderLinks = await page.$$('a[href*="/Cn/Show/"]')
+    console.log(`[${this.name}] Found ${tenderLinks.length} tender links`)
+
+    for (const linkEl of tenderLinks) {
+      const tender = await this.parseTenderLink(linkEl, page)
+      if (tender) results.push(tender)
+    }
+    if (results.length > 0) return results
+
+    // Pattern 3: Generic list-based results
     const listItems = await page.$$('.list-unstyled li, .search-result, .result-item, article')
+    console.log(`[${this.name}] Found ${listItems.length} list items`)
     for (const item of listItems) {
       const tender = await this.parseListItem(item)
       if (tender) results.push(tender)
     }
 
     return results
+  }
+
+  private async parseTenderLink(linkEl: ElementHandle, page: Page): Promise<TenderResult | null> {
+    try {
+      const href = await linkEl.getAttribute('href')
+      if (!href) return null
+
+      // Extract CN number from URL (e.g., /Cn/Show/12345)
+      const cnMatch = href.match(/\/Cn\/Show\/(\d+)/)
+      if (!cnMatch) return null // Only process actual CN links
+
+      const reference = `CN${cnMatch[1]}`
+
+      // Get the link text
+      const linkText = (await linkEl.textContent())?.trim() || ''
+
+      // Skip "Full Details" links and pure CN number links - those don't have titles
+      if (linkText.includes('Full Details') || /^CN\d+$/.test(linkText)) {
+        return null // Will be picked up by another link with actual title
+      }
+
+      // The title should be substantial text (not just a CN number)
+      if (linkText.length < 10) return null
+
+      const title = linkText
+
+      // Try to find agency info and close date from surrounding context
+      let agency = 'Australian Government'
+      let closeDate: string | null = null
+
+      try {
+        // Get the entire row/container text for context
+        const containerData = await linkEl.evaluate(el => {
+          // Navigate up to find the tender row (typically 5-8 levels up)
+          let parent = el.parentElement
+          for (let i = 0; i < 8 && parent; i++) {
+            const text = parent.textContent || ''
+            // Look for a container with tender details
+            if (text.includes('Close Date:') || text.includes('Category:')) {
+              // Extract agency from strong/bold elements at the start
+              const agencyEl = parent.querySelector('strong, b')
+              return {
+                text: text,
+                agency: agencyEl?.textContent || null
+              }
+            }
+            parent = parent.parentElement
+          }
+          return { text: '', agency: null }
+        })
+
+        if (containerData.agency) {
+          agency = containerData.agency.trim()
+        }
+
+        // Extract close date using various patterns
+        const datePatterns = [
+          /Close\s*Date:\s*(\d{1,2}[\/\-]\w{3}[\/\-]\d{4})/i,
+          /Close\s*Date:\s*(\d{1,2}\s+\w+\s+\d{4})/i,
+          /Close\s*Date:\s*(\d{1,2}\/\d{1,2}\/\d{4})/i,
+          /Closes?:\s*(\d{1,2}[\/\-]\w{3}[\/\-]\d{4})/i,
+        ]
+        for (const pattern of datePatterns) {
+          const dateMatch = containerData.text.match(pattern)
+          if (dateMatch) {
+            closeDate = this.parseAustralianDate(dateMatch[1])
+            if (closeDate) break
+          }
+        }
+      } catch {
+        // Ignore extraction errors
+      }
+
+      return {
+        tender_reference: reference,
+        issuing_body: agency,
+        title: title.trim(),
+        description: null,
+        region: 'Australia',
+        close_date: closeDate,
+        estimated_value: null,
+        source_url: href.startsWith('http') ? href : `${this.config.baseUrl}${href}`,
+        portal: this.portalKey,
+      }
+    } catch {
+      return null
+    }
   }
 
   private async parseTableRow(row: ElementHandle): Promise<TenderResult | null> {
