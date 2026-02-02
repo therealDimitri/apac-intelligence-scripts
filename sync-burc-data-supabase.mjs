@@ -80,31 +80,66 @@ async function syncBurcData() {
 
 /**
  * Sync Annual Financials from multiple sheets using direct cell references:
- * - FY2026 Forecast: APAC BURC sheet, Cell U36 ($31.170M)
- * - FY2026 Target: APAC BURC sheet, Cell W36 ($30.906M)
- * - FY2025 Actual: 26 vs 25 Q Comparison sheet, Cell P14 ($26.345M)
+ *
+ * FY2026 Forecasts (Column U):
+ * - Gross Revenue: Cell U36 ($31.6M)
+ * - Maintenance ARR: Cell U60 ($15.9M)
+ * - EBITA: Cell U101 ($6.2M)
+ *
+ * FY2026 Targets (Column W):
+ * - Gross Revenue: Cell W36 ($30.9M)
+ * - Maintenance ARR: Cell W60 ($18.1M)
+ * - EBITA: Cell W101 ($6.2M)
+ *
+ * FY2025 Actual: 26 vs 25 Q Comparison sheet, Cell P14 ($26.345M)
  */
 async function syncAnnualFinancials(workbook) {
   console.log('💵 Extracting Annual Financials (using direct cell references)...');
 
-  let fy2026Total = null;
+  let fy2026GrossRevenue = null;
+  let fy2026TargetGrossRevenue = null;
+  let fy2026TargetArr = null;
+  let fy2026TargetEbita = null;
   let fy2025Total = null;
 
-  // === FY2026: From APAC BURC sheet, Row 36 ===
+  // === FY2026: From APAC BURC sheet ===
   const apacSheet = workbook.Sheets['APAC BURC'];
   if (apacSheet) {
-    // Direct cell references for accuracy
+    // Gross Revenue (Row 36)
     const cellU36 = apacSheet['U36']?.v; // FY2026 Forecast
     const cellW36 = apacSheet['W36']?.v; // FY2026 Target
-    const cellA36 = apacSheet['A36']?.v; // Row label for verification
+    const cellA36 = apacSheet['A36']?.v; // Row label
+
+    // Maintenance ARR (Row 60)
+    const cellU60 = apacSheet['U60']?.v; // FY2026 Forecast ARR
+    const cellW60 = apacSheet['W60']?.v; // FY2026 Target ARR
+    const cellA60 = apacSheet['A60']?.v; // Row label
+
+    // EBITA (Row 101)
+    const cellU101 = apacSheet['U101']?.v; // FY2026 Forecast EBITA
+    const cellW101 = apacSheet['W101']?.v; // FY2026 Target EBITA
+    const cellA101 = apacSheet['A101']?.v; // Row label
 
     if (cellU36 && typeof cellU36 === 'number') {
-      fy2026Total = cellU36;
-      console.log(`   FY2026 Forecast from APAC BURC (Cell U36): $${(fy2026Total / 1000000).toFixed(3)}M`);
-      console.log(`   FY2026 Target from APAC BURC (Cell W36): $${(cellW36 / 1000000).toFixed(3)}M`);
-      console.log(`   Row label: "${cellA36}"`);
-    } else {
-      console.log('   ⚠️ Could not read FY2026 from APAC BURC cell U36');
+      fy2026GrossRevenue = cellU36;
+      fy2026TargetGrossRevenue = typeof cellW36 === 'number' ? cellW36 : null;
+      console.log(`   Gross Revenue (${cellA36}):`);
+      console.log(`     Forecast (U36): $${(fy2026GrossRevenue / 1000000).toFixed(3)}M`);
+      console.log(`     Target (W36):   $${(fy2026TargetGrossRevenue / 1000000).toFixed(3)}M`);
+    }
+
+    if (cellW60 && typeof cellW60 === 'number') {
+      fy2026TargetArr = cellW60;
+      console.log(`   Maintenance ARR (${cellA60}):`);
+      console.log(`     Forecast (U60): $${(cellU60 / 1000000).toFixed(3)}M`);
+      console.log(`     Target (W60):   $${(fy2026TargetArr / 1000000).toFixed(3)}M`);
+    }
+
+    if (cellW101 && typeof cellW101 === 'number') {
+      fy2026TargetEbita = cellW101;
+      console.log(`   EBITA (${cellA101}):`);
+      console.log(`     Forecast (U101): $${(cellU101 / 1000000).toFixed(3)}M`);
+      console.log(`     Target (W101):   $${(fy2026TargetEbita / 1000000).toFixed(3)}M`);
     }
   } else {
     console.log('   ⚠️ Sheet not found: APAC BURC');
@@ -113,39 +148,68 @@ async function syncAnnualFinancials(workbook) {
   // === FY2025: From 26 vs 25 Q Comparison sheet, Row 14 ===
   const compSheet = workbook.Sheets['26 vs 25 Q Comparison'];
   if (compSheet) {
-    // Direct cell reference for accuracy
-    const cellP14 = compSheet['P14']?.v; // FY2025 Actual (25 Total)
-    const cellA14 = compSheet['A14']?.v; // Row label for verification
+    const cellP14 = compSheet['P14']?.v;
+    const cellA14 = compSheet['A14']?.v;
 
     if (cellP14 && typeof cellP14 === 'number') {
       fy2025Total = cellP14;
-      console.log(`   FY2025 Actual from 26 vs 25 Q Comparison (Cell P14): $${(fy2025Total / 1000000).toFixed(3)}M`);
-      console.log(`   Row label: "${cellA14}"`);
-    } else {
-      console.log('   ⚠️ Could not read FY2025 from 26 vs 25 Q Comparison cell P14');
+      console.log(`   FY2025 Actual (${cellA14}): $${(fy2025Total / 1000000).toFixed(3)}M`);
     }
-  } else {
-    console.log('   ⚠️ Sheet not found: 26 vs 25 Q Comparison');
   }
 
-  // Update burc_annual_financials table
-  if (fy2026Total && typeof fy2026Total === 'number') {
+  // Get current ending_arr to calculate variance
+  const { data: currentData } = await supabase
+    .from('burc_annual_financials')
+    .select('ending_arr')
+    .eq('fiscal_year', 2026)
+    .single();
+
+  const endingArr = currentData?.ending_arr || 0;
+
+  // Calculate ARR variance and risk status
+  let arrVariancePercent = null;
+  let arrRiskStatus = 'Unknown';
+
+  if (fy2026TargetArr && endingArr) {
+    arrVariancePercent = ((endingArr - fy2026TargetArr) / fy2026TargetArr) * 100;
+
+    if (arrVariancePercent >= 0) {
+      arrRiskStatus = 'On Track';
+    } else if (arrVariancePercent >= -5) {
+      arrRiskStatus = 'At Risk';
+    } else {
+      arrRiskStatus = 'Critical';
+    }
+
+    console.log(`   ARR Variance: ${arrVariancePercent.toFixed(1)}% (${arrRiskStatus})`);
+  }
+
+  // Update burc_annual_financials table for FY2026
+  if (fy2026GrossRevenue) {
+    const updatePayload = {
+      gross_revenue: fy2026GrossRevenue,
+      target_gross_revenue: fy2026TargetGrossRevenue,
+      target_arr: fy2026TargetArr,
+      target_ebita: fy2026TargetEbita,
+      arr_variance_percent: arrVariancePercent,
+      arr_risk_status: arrRiskStatus,
+      source_file: '2026 APAC Performance.xlsx (APAC BURC sheet)',
+      updated_at: new Date().toISOString()
+    };
+
     const { error: error2026 } = await supabase
       .from('burc_annual_financials')
-      .update({
-        gross_revenue: fy2026Total,
-        source_file: '2026 APAC Performance.xlsx (APAC BURC sheet, Cell U36)',
-        updated_at: new Date().toISOString()
-      })
+      .update(updatePayload)
       .eq('fiscal_year', 2026);
 
     if (error2026) {
       console.error('   ❌ FY2026 update error:', error2026.message);
     } else {
-      console.log(`   ✅ FY2026 updated: $${(fy2026Total / 1000000).toFixed(3)}M`);
+      console.log(`   ✅ FY2026 updated with forecasts and targets`);
     }
   }
 
+  // Update FY2025
   if (fy2025Total && typeof fy2025Total === 'number') {
     const { error: error2025 } = await supabase
       .from('burc_annual_financials')
