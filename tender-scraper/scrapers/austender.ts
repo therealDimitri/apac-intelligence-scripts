@@ -19,7 +19,9 @@ export class AusTenderScraper extends BaseTenderScraper {
     console.log(`[${this.name}] Starting scrape...`)
 
     try {
-      // Navigate to Contract Notices search
+      // Navigate to Contract Notices search (awarded contracts from past 12 months)
+      // This provides more data for testing than open ATMs which may have few results
+      console.log(`[${this.name}] Navigating to Contract Notices search`)
       await page.goto(`${this.config.baseUrl}/Cn/Search`, {
         waitUntil: 'networkidle',
         timeout: this.config.timeout,
@@ -27,54 +29,32 @@ export class AusTenderScraper extends BaseTenderScraper {
 
       await this.humanDelay(page, 2000, 3000)
 
-      // Wait for the search page content to load - look for specific elements
+      // Wait for the search page to load
+      await this.humanDelay(page, 2000, 3000)
+
       try {
-        await page.waitForSelector('h1:has-text("Contract Notices"), .step-indicator, .wizard-step', { timeout: 10000 })
-        console.log(`[${this.name}] Search page loaded`)
+        await page.waitForSelector('h1:has-text("Contract Notices"), form', { timeout: 10000 })
+        console.log(`[${this.name}] Contract Notices search page loaded`)
       } catch {
-        // Page structure might be different, continue anyway
         console.log(`[${this.name}] Continuing without specific page markers`)
       }
 
-      // Take a debug screenshot to see current state
-      await this.takeDebugScreenshot(page, 'form-loaded')
+      await this.takeDebugScreenshot(page, 'cn-search-form')
 
-      // Find the visible keyword input - AusTender has multiple forms on page
-      // The main search form's keyword field should be visible
-      const keywordInput = await page.locator('input[name="Keyword"]:visible, input#Keyword:visible').first()
-
-      try {
-        await keywordInput.waitFor({ state: 'visible', timeout: 5000 })
-        await keywordInput.click()
-        await this.humanDelay(page, 300, 500)
-        await keywordInput.fill(this.config.searchKeywords.join(' '))
-        console.log(`[${this.name}] Filled keyword search: ${this.config.searchKeywords.join(' ')}`)
-      } catch {
-        console.warn(`[${this.name}] Keyword input not found or not visible, proceeding without keywords`)
-        await this.takeDebugScreenshot(page, 'no-keyword-input')
-      }
-
-      // Select Current/Open status if radio button exists
-      const statusRadio = await page.$('input[name="Status"][value="Current"]:visible')
-      if (statusRadio) {
-        await statusRadio.check().catch(() => {})
-        console.log(`[${this.name}] Selected Current status`)
-      }
+      // Search without keywords first to get ALL recent contract notices
+      // We'll filter for healthcare keywords locally after getting results
+      console.log(`[${this.name}] Searching for all recent Contract Notices`)
 
       await this.humanDelay(page, 500, 1000)
 
-      // Find and click the visible search/submit button
-      // AusTender uses a blue button with magnifying glass icon
-      const searchButton = await page.locator('button[type="submit"]:visible, .btn-primary:visible').first()
-
+      // Click the search button (blue magnifying glass)
+      const searchButton = await page.locator('button.btn-primary, button[type="submit"]').first()
       try {
-        await searchButton.waitFor({ state: 'visible', timeout: 5000 })
         await searchButton.click()
         console.log(`[${this.name}] Clicked search button`)
         await page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {})
       } catch {
-        // Try pressing Enter as fallback
-        console.log(`[${this.name}] No visible search button, trying Enter key`)
+        console.log(`[${this.name}] Search button click failed, pressing Enter`)
         await page.keyboard.press('Enter')
         await page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {})
       }
@@ -163,15 +143,187 @@ export class AusTenderScraper extends BaseTenderScraper {
       if (results.length > 0) return results
     }
 
-    // Pattern 2: Contract Notice list items (AusTender 2024+ layout)
-    // Look for links containing "/Cn/Show/" which are individual tender links
-    const tenderLinks = await page.$$('a[href*="/Cn/Show/"]')
-    console.log(`[${this.name}] Found ${tenderLinks.length} tender links`)
+    // Pattern 2: AusTender results list
+    // The page shows "Showing 1-15 of X records" - find the actual result container
+    // Debug: Dump page structure to understand layout
+    const pageStructure = await page.evaluate(() => {
+      // Find elements containing CN links
+      const cnLinks = document.querySelectorAll('a[href*="/Atm/Show/"], a[href*="/Cn/Show/"]')
+      if (cnLinks.length === 0) return { structure: 'No CN links found' }
 
-    for (const linkEl of tenderLinks) {
-      const tender = await this.parseTenderLink(linkEl, page)
-      if (tender) results.push(tender)
+      // Get the common parent of the first CN link
+      const firstLink = cnLinks[0]
+      let parent = firstLink.parentElement
+      const ancestry: string[] = []
+      for (let i = 0; i < 10 && parent; i++) {
+        ancestry.push(`${parent.tagName}.${parent.className}`)
+        parent = parent.parentElement
+      }
+
+      return {
+        linkCount: cnLinks.length,
+        ancestry: ancestry.join(' > '),
+        firstLinkHTML: firstLink.parentElement?.outerHTML?.substring(0, 300) || 'N/A'
+      }
+    })
+    console.log(`[${this.name}] Page structure: ${JSON.stringify(pageStructure, null, 2)}`)
+
+    // Debug: Dump first tender box content
+    const debugContent = await page.evaluate(() => {
+      const firstBox = document.querySelector('[class*="listInner"]')
+      if (!firstBox) return 'No listInner found'
+      return firstBox.innerHTML.substring(0, 1500)
+    })
+    console.log(`[${this.name}] First tender box HTML:\n${debugContent}`)
+
+    // Find CN links and extract tender info from their container
+    const tenderData = await page.evaluate(() => {
+      const results: Array<{
+        reference: string
+        url: string
+        title: string
+        agency: string
+        closeDate: string | null
+        debug?: string
+      }> = []
+
+      const seenCNs = new Set<string>()
+      const cnLinks = document.querySelectorAll('a[href*="/Atm/Show/"], a[href*="/Cn/Show/"]')
+
+      for (const link of cnLinks) {
+        const href = link.getAttribute('href')
+        if (!href) continue
+
+        const cnMatch = href.match(/\/(?:Atm|Cn)\/Show\/([a-f0-9-]+|\d+)/i)
+        if (!cnMatch) continue
+
+        // Use just the CN number for dedup (first 8 chars of GUID or the numeric ID)
+        const cnId = cnMatch[1].length > 10 ? cnMatch[1].substring(0, 8) : cnMatch[1]
+        if (seenCNs.has(cnId)) continue
+        seenCNs.add(cnId)
+
+        // Get CN text from link itself
+        const cnText = link.textContent?.trim() || ''
+
+        // Navigate up to find the row container (class contains "listInner" or is .row parent)
+        let container = link.parentElement
+        for (let i = 0; i < 10 && container; i++) {
+          const classes = container.className || ''
+          // Look for the container with both left (agency) and right (details) columns
+          if (classes.includes('listInner') || (classes.includes('row') && container.querySelector('.col-sm-4'))) {
+            break
+          }
+          container = container.parentElement
+        }
+
+        if (!container) {
+          // Fallback: use grandparent if no suitable container
+          container = link.parentElement?.parentElement?.parentElement || link.parentElement
+        }
+
+        // Get all text from container
+        const allText = container?.textContent || ''
+
+        // Extract agency - look in the left column
+        let agency = 'Australian Government'
+        const leftCol = container?.querySelector('.col-sm-4')
+        if (leftCol) {
+          const agencyText = leftCol.textContent?.trim() || ''
+          // Agency is usually the first line
+          const firstLine = agencyText.split('\n')[0].trim()
+          if (firstLine && firstLine.length > 2 && firstLine.length < 100) {
+            agency = firstLine
+          }
+        }
+
+        // Extract title by looking at the category line
+        // Pattern: "Category: Some Category Title"
+        let title = ''
+
+        // Method 1: Look for Description or Category text pattern
+        // Contract Notices show "Description:" field, ATMs show "Category:"
+        const descMatch = allText.match(/Description:\s*([^\n]+)/i)
+        if (descMatch) {
+          const desc = descMatch[1].trim()
+          if (desc.length > 5 && desc.length < 200) {
+            title = desc
+          }
+        }
+
+        if (!title) {
+          const categoryMatch = allText.match(/Category:\s*([^\n]+)/i)
+          if (categoryMatch) {
+            const category = categoryMatch[1].trim()
+            if (category.length > 5 && category.length < 150) {
+              title = category
+            }
+          }
+        }
+
+        // Method 2: Look for list-desc content excluding metadata
+        if (!title) {
+          const listDesc = container?.querySelector('.list-desc')
+          if (listDesc) {
+            const descText = listDesc.textContent || ''
+            // Find the first substantial line that's not CN or metadata
+            const lines = descText.split('\n').map(l => l.trim()).filter(l => l.length > 10)
+            for (const line of lines) {
+              if (
+                !line.startsWith('CN') &&
+                !line.includes('Close Date') &&
+                !line.includes('Publish Date') &&
+                !line.includes('Category:') &&
+                !line.includes('Full Details') &&
+                !line.includes('forms mode') &&
+                !line.includes('Supplier')
+              ) {
+                title = line.substring(0, 150)
+                break
+              }
+            }
+          }
+        }
+
+        // Method 3: Just use agency + CN as last resort
+        if (!title) {
+          title = `${agency} Tender ${cnText}`
+        }
+
+        // Extract close date
+        let closeDate: string | null = null
+        const dateMatch = allText.match(/Close\s*Date:\s*(\d{1,2}[\/\-]\w{3}[\/\-]\d{4}|\d{1,2}\s+\w+\s+\d{4})/i)
+        if (dateMatch) {
+          closeDate = dateMatch[1]
+        }
+
+        results.push({
+          reference: cnText || `CN${cnId}`,
+          url: href,
+          title,
+          agency,
+          closeDate,
+        })
+      }
+
+      return results
+    })
+
+    console.log(`[${this.name}] Extracted ${tenderData.length} tenders from page`)
+
+    for (const item of tenderData) {
+      results.push({
+        tender_reference: item.reference,
+        issuing_body: item.agency,
+        title: item.title,
+        description: null,
+        region: 'Australia',
+        close_date: this.parseAustralianDate(item.closeDate),
+        estimated_value: null,
+        source_url: item.url.startsWith('http') ? item.url : `${this.config.baseUrl}${item.url}`,
+        portal: this.portalKey,
+      })
     }
+
     if (results.length > 0) return results
 
     // Pattern 3: Generic list-based results
@@ -376,6 +528,76 @@ export class AusTenderScraper extends BaseTenderScraper {
             ? link
             : `${this.config.baseUrl}${link}`
           : this.config.baseUrl,
+        portal: this.portalKey,
+      }
+    } catch {
+      return null
+    }
+  }
+
+  private async parseContainerRow(row: ElementHandle): Promise<TenderResult | null> {
+    try {
+      // Find CN link in this row
+      const cnLink = await row.$('a[href*="/Atm/Show/"], a[href*="/Cn/Show/"]')
+      if (!cnLink) return null
+
+      const href = await cnLink.getAttribute('href')
+      if (!href) return null
+
+      const cnMatch = href.match(/\/Cn\/Show\/(\d+)/)
+      if (!cnMatch) return null
+
+      const reference = `CN${cnMatch[1]}`
+
+      // Extract all text from the row to find the title
+      const rowData = await row.evaluate((el: Element) => {
+        const text = el.textContent || ''
+        const innerHTML = el.innerHTML || ''
+
+        // Find the title - it's usually the longest text segment that's not metadata
+        // Split by common delimiters and find substantial text
+        const segments = text.split(/[\n\r\t|]+/).map(s => s.trim()).filter(s => s.length > 10)
+
+        // Filter out segments that look like metadata
+        const titleCandidates = segments.filter(
+          s =>
+            !s.startsWith('CN') &&
+            !s.includes('Close Date:') &&
+            !s.includes('Category:') &&
+            !s.includes('Full Details') &&
+            !s.includes('Supplier Name:') &&
+            !s.includes('Publish Date:') &&
+            !/^\d{1,2}[\/\-]/.test(s) // Not a date
+        )
+
+        // The title is usually the first substantial text segment
+        const title = titleCandidates[0] || ''
+
+        // Extract agency - usually in bold or at the start
+        let agency = ''
+        const strongMatch = innerHTML.match(/<strong[^>]*>([^<]+)<\/strong>/i)
+        if (strongMatch) {
+          agency = strongMatch[1].trim()
+        }
+
+        // Extract close date
+        const dateMatch = text.match(/Close\s*Date:\s*(\d{1,2}[\/\-]\w{3,}[\/\-]?\d{2,4}|\d{1,2}\s+\w+\s+\d{4})/i)
+        const closeDate = dateMatch ? dateMatch[1] : null
+
+        return { title, agency, closeDate }
+      })
+
+      if (!rowData.title || rowData.title.length < 10) return null
+
+      return {
+        tender_reference: reference,
+        issuing_body: rowData.agency || 'Australian Government',
+        title: rowData.title,
+        description: null,
+        region: 'Australia',
+        close_date: this.parseAustralianDate(rowData.closeDate),
+        estimated_value: null,
+        source_url: `${this.config.baseUrl}${href}`,
         portal: this.portalKey,
       }
     } catch {
