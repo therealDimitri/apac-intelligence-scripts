@@ -87,3 +87,11 @@ All scripts use `.mjs` extension and ES modules syntax:
 ## Autonomous Workflow
 
 For this repo: Edit → Commit → Push. No build or test steps required.
+
+## Tender Scraper
+
+- **Location**: `tender-scraper/` directory
+- **Run single portal**: `PORTALS=austender npx tsx tender-scraper/index.ts`
+- **Debug screenshots**: Saved to `tender-scraper/screenshots/` with timestamps
+- **maxPages config**: In `tender-scraper/types.ts` - increase for historical data (default: 50 for AusTender)
+- **Healthcare filtering**: Patterns in `scrapers/austender.ts` match agency names and titles
