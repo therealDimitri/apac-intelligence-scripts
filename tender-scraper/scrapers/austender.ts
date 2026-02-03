@@ -19,8 +19,7 @@ export class AusTenderScraper extends BaseTenderScraper {
     console.log(`[${this.name}] Starting scrape...`)
 
     try {
-      // Navigate to Contract Notices search (awarded contracts from past 12 months)
-      // This provides more data for testing than open ATMs which may have few results
+      // Navigate to Contract Notices search and submit form
       console.log(`[${this.name}] Navigating to Contract Notices search`)
       await page.goto(`${this.config.baseUrl}/Cn/Search`, {
         waitUntil: 'networkidle',
@@ -28,39 +27,35 @@ export class AusTenderScraper extends BaseTenderScraper {
       })
 
       await this.humanDelay(page, 2000, 3000)
+      await this.takeDebugScreenshot(page, 'cn-search')
 
-      // Wait for the search page to load
-      await this.humanDelay(page, 2000, 3000)
+      // Click the "View" button next to "View by Publish Date"
+      // This button has a pre-filled date range and will show results
+      console.log(`[${this.name}] Clicking View button for date-based results...`)
 
-      try {
-        await page.waitForSelector('h1:has-text("Contract Notices"), form', { timeout: 10000 })
-        console.log(`[${this.name}] Contract Notices search page loaded`)
-      } catch {
-        console.log(`[${this.name}] Continuing without specific page markers`)
+      // The View button is in the "View by Publish Date" section
+      const viewButton = await page.$('a.btn:has-text("View"), button:has-text("View")')
+      if (viewButton) {
+        await viewButton.click()
+        console.log(`[${this.name}] Clicked View button`)
+      } else {
+        // Try clicking by evaluating
+        await page.evaluate(() => {
+          const buttons = document.querySelectorAll('a.btn, button')
+          for (const btn of buttons) {
+            if (btn.textContent?.trim() === 'View') {
+              (btn as HTMLElement).click()
+              return
+            }
+          }
+        })
+        console.log(`[${this.name}] Used evaluate to click View button`)
       }
 
-      await this.takeDebugScreenshot(page, 'cn-search-form')
-
-      // Search without keywords first to get ALL recent contract notices
-      // We'll filter for healthcare keywords locally after getting results
-      console.log(`[${this.name}] Searching for all recent Contract Notices`)
-
-      await this.humanDelay(page, 500, 1000)
-
-      // Click the search button (blue magnifying glass)
-      const searchButton = await page.locator('button.btn-primary, button[type="submit"]').first()
-      try {
-        await searchButton.click()
-        console.log(`[${this.name}] Clicked search button`)
-        await page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {})
-      } catch {
-        console.log(`[${this.name}] Search button click failed, pressing Enter`)
-        await page.keyboard.press('Enter')
-        await page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {})
-      }
-
-      await this.humanDelay(page, 2000, 4000)
-      await this.takeDebugScreenshot(page, 'after-search')
+      // Wait for results page to load
+      await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {})
+      await this.humanDelay(page, 3000, 5000)
+      await this.takeDebugScreenshot(page, 'cn-results')
 
       // Parse results from multiple possible structures
       let pageNum = 0
@@ -100,22 +95,41 @@ export class AusTenderScraper extends BaseTenderScraper {
         }
       }
 
-      // Debug: Show first few titles
-      console.log(`[${this.name}] Sample titles found:`)
+      // Debug: Show first few entries
+      console.log(`[${this.name}] Sample entries found:`)
       results.slice(0, 5).forEach((t, i) => {
-        console.log(`  ${i + 1}. "${t.title.substring(0, 80)}..."`)
+        console.log(`  ${i + 1}. ${t.tender_reference}: ${t.issuing_body.substring(0, 50)}`)
       })
 
-      // Filter for healthcare-related tenders
-      const healthcareTenders = results.filter(t => this.isHealthcareRelated(t.title, t.description))
+      // For Contract Notices, filter by healthcare-related agencies instead of title
+      // Common healthcare agencies include: Health, Hospital, Medical, NDIS, Aged Care
+      const healthcareAgencyPatterns = [
+        /health/i,
+        /hospital/i,
+        /medical/i,
+        /ndis/i,
+        /aged care/i,
+        /disability/i,
+        /pharmaceutical/i,
+        /therapeutic/i,
+        /nursing/i,
+        /ambulance/i,
+      ]
+
+      const healthcareTenders = results.filter(t => {
+        // Check if issuing body or title contains healthcare keywords
+        const text = `${t.issuing_body} ${t.title}`.toLowerCase()
+        return healthcareAgencyPatterns.some(pattern => pattern.test(text)) ||
+               this.isHealthcareRelated(t.title, t.description)
+      })
+
       console.log(`[${this.name}] Total: ${results.length}, Healthcare-related: ${healthcareTenders.length}`)
 
-      // If few healthcare results, also show which ones matched
-      if (healthcareTenders.length > 0 && healthcareTenders.length <= 10) {
-        console.log(`[${this.name}] Matched tenders:`)
-        healthcareTenders.forEach((t, i) => {
-          console.log(`  ${i + 1}. ${t.tender_reference}: ${t.title.substring(0, 60)}`)
-        })
+      // Return all results for testing (healthcare filtering may be too strict for Contract Notices)
+      // TODO: Refine healthcare filtering based on actual data
+      if (healthcareTenders.length === 0 && results.length > 0) {
+        console.log(`[${this.name}] No healthcare matches, returning all ${results.length} results for testing`)
+        return results
       }
 
       return healthcareTenders
@@ -224,15 +238,46 @@ export class AusTenderScraper extends BaseTenderScraper {
         // Get all text from container
         const allText = container?.textContent || ''
 
-        // Extract agency - look in the left column
+        // Extract agency from the list-desc structure
+        // Contract Notices: <div class="list-desc"><span>Agency:</span><div class="list-desc-inner">Agency Name</div></div>
         let agency = 'Australian Government'
-        const leftCol = container?.querySelector('.col-sm-4')
-        if (leftCol) {
-          const agencyText = leftCol.textContent?.trim() || ''
-          // Agency is usually the first line
-          const firstLine = agencyText.split('\n')[0].trim()
-          if (firstLine && firstLine.length > 2 && firstLine.length < 100) {
-            agency = firstLine
+
+        // Method 1: Look for Agency: in text and extract the value after it
+        const agencyMatch = allText.match(/Agency:\s*([^\n]+)/i)
+        if (agencyMatch && agencyMatch[1]) {
+          const agencyName = agencyMatch[1].trim()
+          if (agencyName.length > 2 && agencyName.length < 150 && !agencyName.includes('Publish Date')) {
+            agency = agencyName
+          }
+        }
+
+        // Method 2: Look for .list-desc-inner after Agency label
+        if (agency === 'Australian Government' && container) {
+          const listDescs = container.querySelectorAll('.list-desc')
+          for (const desc of listDescs) {
+            const label = desc.querySelector('span')?.textContent?.trim()
+            if (label === 'Agency:') {
+              const inner = desc.querySelector('.list-desc-inner')
+              if (inner && inner.textContent) {
+                const agencyName = inner.textContent.trim()
+                if (agencyName.length > 2 && agencyName.length < 150) {
+                  agency = agencyName
+                }
+              }
+              break
+            }
+          }
+        }
+
+        // Method 3: Fallback - try .col-sm-4 for older layouts
+        if (agency === 'Australian Government') {
+          const leftCol = container?.querySelector('.col-sm-4')
+          if (leftCol) {
+            const agencyText = leftCol.textContent?.trim() || ''
+            const firstLine = agencyText.split('\n')[0].trim()
+            if (firstLine && firstLine.length > 2 && firstLine.length < 100) {
+              agency = firstLine
+            }
           }
         }
 

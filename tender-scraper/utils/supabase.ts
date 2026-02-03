@@ -11,13 +11,19 @@ let supabase: SupabaseClient | null = null
 export function getSupabase(): SupabaseClient {
   if (supabase) return supabase
 
-  const url = process.env.SUPABASE_URL
+  // Support both GitHub Actions env vars and local .env.local format
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (!url || !key) {
-    throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables')
+    console.error('Environment check:')
+    console.error('  SUPABASE_URL:', process.env.SUPABASE_URL ? 'set' : 'not set')
+    console.error('  NEXT_PUBLIC_SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? 'set' : 'not set')
+    console.error('  SUPABASE_SERVICE_ROLE_KEY:', process.env.SUPABASE_SERVICE_ROLE_KEY ? 'set' : 'not set')
+    throw new Error('Missing SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL) or SUPABASE_SERVICE_ROLE_KEY environment variables')
   }
 
+  console.log(`[Supabase] Connecting to: ${url.substring(0, 30)}...`)
   supabase = createClient(url, key)
   return supabase
 }
@@ -43,6 +49,8 @@ export async function storeTenders(tenders: TenderResult[]): Promise<number> {
   }
 
   // Insert new tenders
+  // Note: source_url is stored in TenderResult but not in the DB schema
+  // We store it in the notes field as a workaround
   const toInsert = newTenders.map(t => ({
     tender_reference: t.tender_reference,
     issuing_body: t.issuing_body,
@@ -52,7 +60,7 @@ export async function storeTenders(tenders: TenderResult[]): Promise<number> {
     close_date: t.close_date,
     estimated_value: t.estimated_value,
     status: 'open',
-    source_url: t.source_url,
+    notes: t.source_url ? `Source: ${t.source_url}` : null,
   }))
 
   const { error } = await supabase.from('tender_opportunities').insert(toInsert)
