@@ -38,7 +38,7 @@ export const PORTAL_CONFIGS: Record<string, ScraperConfig> = {
     enabled: true,
     baseUrl: 'https://www.tenders.gov.au',
     searchKeywords: ['health', 'hospital', 'medical', 'clinical', 'healthcare'],
-    maxPages: 5,
+    maxPages: 50, // 12 months of data needs more pages
     timeout: 30000,
   },
   victoria: {

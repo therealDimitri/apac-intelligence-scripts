@@ -29,28 +29,158 @@ export class AusTenderScraper extends BaseTenderScraper {
       await this.humanDelay(page, 2000, 3000)
       await this.takeDebugScreenshot(page, 'cn-search')
 
-      // Click the "View" button next to "View by Publish Date"
-      // This button has a pre-filled date range and will show results
-      console.log(`[${this.name}] Clicking View button for date-based results...`)
+      // Set date range to past 12 months for comprehensive results
+      // Using Advanced Search section with Date Range fields
+      console.log(`[${this.name}] Setting date range to past 12 months via Advanced Search...`)
 
-      // The View button is in the "View by Publish Date" section
-      const viewButton = await page.$('a.btn:has-text("View"), button:has-text("View")')
-      if (viewButton) {
-        await viewButton.click()
-        console.log(`[${this.name}] Clicked View button`)
-      } else {
-        // Try clicking by evaluating
-        await page.evaluate(() => {
-          const buttons = document.querySelectorAll('a.btn, button')
-          for (const btn of buttons) {
-            if (btn.textContent?.trim() === 'View') {
-              (btn as HTMLElement).click()
-              return
+      // Calculate date range (12 months ago to today)
+      const today = new Date()
+      const twelveMonthsAgo = new Date()
+      twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1)
+
+      // Format dates as DD-MMM-YYYY (AusTender format, e.g., "03-Feb-2025")
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+      const formatDate = (d: Date) => {
+        const day = d.getDate().toString().padStart(2, '0')
+        const month = months[d.getMonth()]
+        const year = d.getFullYear()
+        return `${day}-${month}-${year}`
+      }
+
+      const fromDate = formatDate(twelveMonthsAgo)
+      const toDate = formatDate(today)
+
+      console.log(`[${this.name}] Date range: ${fromDate} to ${toDate}`)
+
+      // Fill in the "Date Range" From field in Advanced Search
+      // The field shows placeholder "DD-MMM-YYYY" and has label "From:"
+      const dateRangeFilled = await page.evaluate((dates: { from: string; to: string }) => {
+        // Find all inputs with date picker behavior
+        const allInputs = Array.from(document.querySelectorAll('input[type="text"]'))
+        let fromFilled = false
+        let toFilled = false
+
+        for (const input of allInputs) {
+          const el = input as HTMLInputElement
+          const placeholder = el.placeholder || ''
+          const parentText = el.parentElement?.textContent || ''
+
+          // Look for the From date field
+          if (!fromFilled && (placeholder.includes('DD-MMM-YYYY') || parentText.toLowerCase().includes('from'))) {
+            // Check if this is the first date input (From)
+            const previousText = el.parentElement?.previousElementSibling?.textContent || ''
+            if (previousText.toLowerCase().includes('from') || parentText.toLowerCase().startsWith('from')) {
+              el.value = dates.from
+              el.dispatchEvent(new Event('input', { bubbles: true }))
+              el.dispatchEvent(new Event('change', { bubbles: true }))
+              fromFilled = true
+              console.log('Set From date:', dates.from)
+              continue
             }
           }
-        })
-        console.log(`[${this.name}] Used evaluate to click View button`)
+
+          // Look for the To date field
+          if (fromFilled && !toFilled && (placeholder.includes('DD-MMM-YYYY') || parentText.toLowerCase().includes('to'))) {
+            el.value = dates.to
+            el.dispatchEvent(new Event('input', { bubbles: true }))
+            el.dispatchEvent(new Event('change', { bubbles: true }))
+            toFilled = true
+            console.log('Set To date:', dates.to)
+          }
+
+          if (fromFilled && toFilled) break
+        }
+
+        return { fromFilled, toFilled }
+      }, { from: fromDate, to: toDate })
+
+      console.log(`[${this.name}] Date fields filled: From=${dateRangeFilled.fromFilled}, To=${dateRangeFilled.toFilled}`)
+
+      // Alternative: Try clicking on input fields and typing
+      if (!dateRangeFilled.fromFilled) {
+        // Try using Playwright locators to find the date range inputs
+        const fromInputs = page.locator('input[placeholder*="DD-MMM-YYYY"]')
+        const count = await fromInputs.count()
+        console.log(`[${this.name}] Found ${count} date inputs with DD-MMM-YYYY placeholder`)
+
+        if (count >= 2) {
+          // First one is From, second is To
+          await fromInputs.nth(0).click()
+          await fromInputs.nth(0).fill(fromDate)
+          console.log(`[${this.name}] Filled From date via locator`)
+
+          await fromInputs.nth(1).click()
+          await fromInputs.nth(1).fill(toDate)
+          console.log(`[${this.name}] Filled To date via locator`)
+        }
       }
+
+      await this.humanDelay(page, 500, 1000)
+      await this.takeDebugScreenshot(page, 'dates-filled')
+
+      // Click the search button (blue magnifying glass) in Advanced Search
+      console.log(`[${this.name}] Clicking search button...`)
+
+      // Scroll down to make sure search button is visible
+      await page.evaluate(() => {
+        window.scrollTo(0, document.body.scrollHeight)
+      })
+      await this.humanDelay(page, 500, 1000)
+
+      // The search button is a blue/primary button at the bottom of the Advanced Search form
+      // Try multiple approaches to click it
+      let clicked = false
+
+      // Method 1: Use evaluate to find and click the submit button
+      clicked = await page.evaluate(() => {
+        // Look for the search form's submit button - it's typically a button with search icon
+        const buttons = document.querySelectorAll('button[type="submit"], input[type="submit"], .btn-primary, button.btn')
+        for (const btn of buttons) {
+          const el = btn as HTMLElement
+          const rect = el.getBoundingClientRect()
+          // Check if it's visible and clickable (has reasonable size and position)
+          if (rect.width > 20 && rect.height > 20 && rect.top > 0) {
+            // Check if it looks like a search button (has magnifying glass icon or "search" text)
+            const hasSearchIcon = el.querySelector('.fa-search, .glyphicon-search, [class*="search"]')
+            const isSubmit = el.getAttribute('type') === 'submit'
+            const isPrimary = el.classList.contains('btn-primary')
+            if (hasSearchIcon || isSubmit || isPrimary) {
+              el.scrollIntoView({ block: 'center' })
+              el.click()
+              console.log('Clicked search button:', el.outerHTML.substring(0, 100))
+              return true
+            }
+          }
+        }
+        // Fallback: Submit the form directly
+        const form = document.querySelector('form')
+        if (form) {
+          const submitBtn = form.querySelector('[type="submit"]') as HTMLElement
+          if (submitBtn) {
+            submitBtn.click()
+            console.log('Clicked form submit button')
+            return true
+          }
+          // Last resort: submit the form
+          form.submit()
+          console.log('Submitted form directly')
+          return true
+        }
+        return false
+      })
+
+      if (!clicked) {
+        // Method 2: Use Playwright locator
+        const searchBtn = page.locator('button[type="submit"], input[type="submit"]').first()
+        if (await searchBtn.isVisible().catch(() => false)) {
+          await searchBtn.scrollIntoViewIfNeeded()
+          await searchBtn.click({ timeout: 5000 })
+          console.log(`[${this.name}] Clicked search button via locator`)
+          clicked = true
+        }
+      }
+
+      console.log(`[${this.name}] Search button clicked: ${clicked}`)
 
       // Wait for results page to load
       await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {})
@@ -75,20 +205,72 @@ export class AusTenderScraper extends BaseTenderScraper {
 
         // Check for next page - only proceed if button exists AND is visible
         try {
+          // AusTender pagination uses ">" for next and ">>" for last page
+          // The structure is: "1 2 3 4 5 ... 1168 >"
           const nextLocator = page.locator(
-            '.pagination .next:not(.disabled), a[rel="next"], .page-link:has-text("Next"), a:has-text("Next")'
+            '.pagination a:has-text(">"):not(:has-text(">>")), a[rel="next"], .page-link:has-text("Next"), a:has-text("Next")'
           ).first()
 
-          const isVisible = await nextLocator.isVisible().catch(() => false)
-          if (!isVisible) {
+          // Also try to find via evaluate
+          let hasNextPage = await nextLocator.isVisible().catch(() => false)
+
+          if (!hasNextPage) {
+            // Fallback: look for next page link using evaluate
+            hasNextPage = await page.evaluate(() => {
+              // Find pagination container
+              const pagination = document.querySelector('.pagination, .pager, [class*="pagination"]')
+              if (!pagination) return false
+
+              // Look for > link that isn't >>
+              const links = pagination.querySelectorAll('a')
+              for (const link of links) {
+                const text = link.textContent?.trim() || ''
+                if (text === '>' || text === '›' || text === 'Next') {
+                  // Check if it's not disabled
+                  const parent = link.parentElement
+                  if (!parent?.classList.contains('disabled') && !link.classList.contains('disabled')) {
+                    return true
+                  }
+                }
+              }
+              return false
+            })
+          }
+
+          if (!hasNextPage) {
             console.log(`[${this.name}] No visible next button, done paginating`)
             break
           }
 
-          await nextLocator.click({ timeout: 5000 })
+          // Click the next page link
+          const clicked = await page.evaluate(() => {
+            const pagination = document.querySelector('.pagination, .pager, [class*="pagination"]')
+            if (!pagination) return false
+
+            const links = pagination.querySelectorAll('a')
+            for (const link of links) {
+              const text = link.textContent?.trim() || ''
+              if (text === '>' || text === '›' || text === 'Next') {
+                const parent = link.parentElement
+                if (!parent?.classList.contains('disabled') && !link.classList.contains('disabled')) {
+                  (link as HTMLElement).click()
+                  console.log('Clicked next page:', text)
+                  return true
+                }
+              }
+            }
+            return false
+          })
+
+          if (!clicked) {
+            // Try Playwright click as fallback
+            await nextLocator.click({ timeout: 5000 })
+          }
+
           await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {})
           await this.humanDelay(page)
           pageNum++
+          console.log(`[${this.name}] Moved to page ${pageNum + 1}`)
         } catch (navError) {
           console.log(`[${this.name}] Pagination stopped: ${navError instanceof Error ? navError.message : 'unknown'}`)
           break
