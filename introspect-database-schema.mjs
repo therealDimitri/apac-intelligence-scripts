@@ -56,7 +56,19 @@ const TABLES = [
   'chasen_folders',
   // Health history tracking
   'client_health_history',
-  'health_status_alerts'
+  'health_status_alerts',
+  // Goals & Initiatives system
+  'company_goals',
+  'team_goals',
+  'goal_templates',
+  'goal_check_ins',
+  'goal_dependencies',
+  'goal_approvals',
+  'goal_audit_log',
+  'custom_roles',
+  'user_role_assignments',
+  'role_mapping_rules',
+  'ms_graph_sync_log',
 ]
 
 async function introspectSchema() {
