@@ -11,13 +11,16 @@ import { createClient } from '@supabase/supabase-js';
 import XLSX from 'xlsx';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import { DOCUMENTS, requireOneDrive } from './lib/onedrive-paths.mjs'
+
+requireOneDrive()
 
 const supabase = createClient(
   'https://usoyxsunetvxdjdglkmn.supabase.co',
   process.env.SUPABASE_SERVICE_ROLE_KEY || 'sb_secret_tg9qhHtwhKS0rPe_FUgzKA_nOyqLAas'
 );
 
-const EXCEL_PATH = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/Documents/Client Success/Team Docs/Sales Targets/2026/APAC 2026 Sales Budget 6Jan2026.xlsx';
+const EXCEL_PATH = `${DOCUMENTS}/Client Success/Team Docs/Sales Targets/2026/APAC 2026 Sales Budget 6Jan2026.xlsx`;
 
 async function createTables() {
   console.log('Creating tables...');

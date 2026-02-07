@@ -14,8 +14,11 @@ import { createClient } from '@supabase/supabase-js'
 import * as XLSX from 'xlsx'
 import * as fs from 'fs'
 import * as dotenv from 'dotenv'
+import { DOCUMENTS, requireOneDrive } from './lib/onedrive-paths.mjs'
 
 // Load environment variables
+requireOneDrive()
+
 dotenv.config({ path: '.env.local' })
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -28,7 +31,7 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-const SALES_BUDGET_PATH = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/Documents/Client Success/Sales Planning & Targets/Sales Targets/2026/APAC 2026 Sales Budget 14Jan2026 v0.1.xlsx'
+const SALES_BUDGET_PATH = `${DOCUMENTS}/Client Success/Sales Planning & Targets/Sales Targets/2026/APAC 2026 Sales Budget 14Jan2026 v0.1.xlsx`
 
 const SOURCE_FILE = 'APAC 2026 Sales Budget 14Jan2026 v0.1'
 

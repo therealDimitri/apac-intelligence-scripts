@@ -24,6 +24,9 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
 import fs from 'fs';
+import { burcFile, requireOneDrive } from './lib/onedrive-paths.mjs'
+
+requireOneDrive()
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '..', '.env.local') });
@@ -231,7 +234,7 @@ class LineageTracker {
 // ============================================================================
 
 async function syncEbitaWithLineage() {
-  const BURC_PATH = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2026/Budget Planning/2026 APAC Performance.xlsx';
+  const BURC_PATH = burcFile(2026, 'Budget Planning/2026 APAC Performance.xlsx');
 
   console.log('📊 Starting BURC sync with data lineage tracking...\n');
 

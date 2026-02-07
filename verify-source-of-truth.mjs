@@ -9,6 +9,9 @@
 import XLSX from 'xlsx'
 import { createClient } from '@supabase/supabase-js'
 import dotenv from 'dotenv'
+import { burcFile, requireOneDrive } from './lib/onedrive-paths.mjs'
+
+requireOneDrive()
 
 dotenv.config({ path: '.env.local' })
 
@@ -18,10 +21,10 @@ const supabase = createClient(
 )
 
 const SOURCE_FILES = {
-  2023: '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2023/Dec 23/2023 12 BURC File.xlsb',
-  2024: '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2024/2024 APAC Performance.xlsx',
-  2025: '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2026/Budget Planning/2026 APAC Performance.xlsx',
-  2026: '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2026/Budget Planning/2026 APAC Performance.xlsx',
+  2023: burcFile(2023, 'Dec 23/2023 12 BURC File.xlsb'),
+  2024: burcFile(2024, '2024 APAC Performance.xlsx'),
+  2025: burcFile(2026, 'Budget Planning/2026 APAC Performance.xlsx'),
+  2026: burcFile(2026, 'Budget Planning/2026 APAC Performance.xlsx'),
 }
 
 async function analyzeSourceFile(year, filePath) {

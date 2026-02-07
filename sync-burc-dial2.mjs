@@ -17,6 +17,9 @@ import XLSX from 'xlsx';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import { BURC_MASTER_FILE, requireOneDrive } from './lib/onedrive-paths.mjs'
+
+requireOneDrive()
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '..', '.env.local') });
@@ -26,7 +29,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-const BURC_PATH = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2026/2026 APAC Performance.xlsx';
+const BURC_PATH = BURC_MASTER_FILE;
 
 async function syncDial2() {
   console.log('=== Syncing Dial 2 Risk Profile Summary ===\n');

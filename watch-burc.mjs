@@ -19,10 +19,13 @@ import chokidar from 'chokidar';
 import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { burcFile, requireOneDrive } from './lib/onedrive-paths.mjs'
+
+requireOneDrive()
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const BURC_PATH = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2026/Budget Planning/2026 APAC Performance.xlsx';
+const BURC_PATH = burcFile(2026, 'Budget Planning/2026 APAC Performance.xlsx');
 const SYNC_SCRIPT = path.join(__dirname, 'sync-burc-data-supabase.mjs');
 const DEBOUNCE_MS = 5000; // Wait 5 seconds after last change before syncing
 

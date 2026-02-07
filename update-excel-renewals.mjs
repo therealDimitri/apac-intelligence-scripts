@@ -9,8 +9,11 @@
 import XLSX from 'xlsx'
 import path from 'path'
 import fs from 'fs'
+import { BURC_BASE, requireOneDrive } from './lib/onedrive-paths.mjs'
 
-const BURC_BASE = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC'
+requireOneDrive()
+
+const BURC_BASE = BURC_BASE
 const PERFORMANCE_FILE = `${BURC_BASE}/2026/2026 APAC Performance.xlsx`
 const SHEET_NAME = 'Opal Maint Contracts and Value'
 

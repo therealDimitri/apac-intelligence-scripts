@@ -5,9 +5,12 @@
 
 import XLSX from 'xlsx'
 import path from 'path'
+import { burcFile, requireOneDrive } from './lib/onedrive-paths.mjs'
+
+requireOneDrive()
 
 const filePath =
-  '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2026/Budget Planning/2026 APAC Performance.xlsx'
+  burcFile(2026, 'Budget Planning/2026 APAC Performance.xlsx')
 
 async function analyzeFile() {
   console.log('📊 Analyzing 2026 APAC Performance.xlsx')

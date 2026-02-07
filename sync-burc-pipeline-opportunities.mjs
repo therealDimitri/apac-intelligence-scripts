@@ -25,6 +25,9 @@ import dotenv from 'dotenv'
 import XLSX from 'xlsx'
 import path from 'path'
 import fs from 'fs'
+import { burcFile, requireOneDrive } from './lib/onedrive-paths.mjs'
+
+requireOneDrive()
 
 dotenv.config({ path: '.env.local' })
 
@@ -41,10 +44,7 @@ const VERBOSE = process.argv.includes('--verbose')
 // ============================================================================
 
 // BURC Master File Path
-const BURC_MASTER_FILE = path.join(
-  process.env.HOME,
-  'Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2026/2026 APAC Performance.xlsx'
-)
+const BURC_MASTER_FILE = burcFile(2026, '2026 APAC Performance.xlsx')
 
 // CSE Territory Mapping (mirrors PlanningPortfolioContext.tsx)
 const CSE_TERRITORY_MAP = {

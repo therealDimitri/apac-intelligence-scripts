@@ -21,6 +21,9 @@ import { createClient } from '@supabase/supabase-js'
 import dotenv from 'dotenv'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
+import { DOCUMENTS, requireOneDrive } from './lib/onedrive-paths.mjs'
+
+requireOneDrive()
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -30,7 +33,7 @@ dotenv.config({ path: join(__dirname, '..', '.env.local') })
 
 // Configuration
 const EXCEL_PATH =
-  '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/Documents/Client Success/Team Docs/Sales Targets/2026/APAC 2026 Sales Budget 6Jan2026.xlsx'
+  `${DOCUMENTS}/Client Success/Team Docs/Sales Targets/2026/APAC 2026 Sales Budget 6Jan2026.xlsx`
 const SHEET_NAME = 'APAC Pipeline by Qtr (2)'
 const HEADER_ROW = 5 // 0-indexed row where headers are
 

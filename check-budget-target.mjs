@@ -1,6 +1,9 @@
 import XLSX from 'xlsx'
+import { BURC_MASTER_FILE, burcFile, requireOneDrive } from './lib/onedrive-paths.mjs'
 
-const wb = XLSX.readFile('/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2026/2026 APAC Performance.xlsx')
+requireOneDrive()
+
+const wb = XLSX.readFile(BURC_MASTER_FILE)
 
 // Look for budget/target in Waterfall Data sheet
 console.log('=== Waterfall Data Sheet ===')
@@ -22,7 +25,7 @@ if (waterfall) {
 // Also check Budget Planning folder
 console.log('\n\n=== Checking Budget Planning folder ===')
 import { readdirSync } from 'fs'
-const budgetPath = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2026/Budget Planning/'
+const budgetPath = burcFile(2026, 'Budget Planning/')
 try {
   const files = readdirSync(budgetPath)
   files.forEach(f => console.log(f))

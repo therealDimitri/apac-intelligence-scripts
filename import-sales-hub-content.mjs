@@ -12,6 +12,9 @@ import { fileURLToPath } from 'url'
 import { dirname, join, basename } from 'path'
 import { createRequire } from 'module'
 import fs from 'fs'
+import { MARKETING, requireOneDrive } from './lib/onedrive-paths.mjs'
+
+requireOneDrive()
 
 const require = createRequire(import.meta.url)
 const { PDFParse } = require('pdf-parse')
@@ -30,7 +33,7 @@ const MATCHAAI_API_KEY = process.env.MATCHAAI_API_KEY
 const MATCHAAI_MISSION_ID = process.env.MATCHAAI_MISSION_ID
 
 // Path mappings
-const LOCAL_BASE = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/Marketing - Marketing Collateral/Altera Content'
+const LOCAL_BASE = `${MARKETING}/Altera Content`
 const SHAREPOINT_BASE = 'https://alteradh.sharepoint.com/sites/Marketing/Shared%20Documents/Marketing%20Collateral/Altera%20Content'
 
 // Content type folders

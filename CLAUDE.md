@@ -2,10 +2,12 @@
 
 Utility scripts submodule for the APAC Intelligence application. No npm install, no build, no tests, no deployment.
 
-## OneDrive Path Gotchas
-- Many scripts hardcode OneDrive paths to Excel files — these break when OneDrive is reconfigured or OS is re-imaged
-- Correct BURC base: `/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC`
-- Audit all paths: `grep -r "OneDrive" --include="*.mjs" .`
+## OneDrive Path Resolver
+- **Central resolver**: `lib/onedrive-paths.mjs` — auto-detects OneDrive base path, no hardcoded user paths
+- All scripts import from resolver: `import { BURC_MASTER_FILE, requireOneDrive } from './lib/onedrive-paths.mjs'`
+- New scripts MUST use the resolver — never hardcode OneDrive paths
+- Available exports: `ONEDRIVE_BASE`, `BURC_BASE`, `CLIENT_SUCCESS`, `DOCUMENTS`, `MARKETING`, `BRAND_TEMPLATES`, `BURC_MASTER_FILE`, `ACTIVITY_REGISTER_2025`, `ACTIVITY_REGISTER_2026`
+- `burcFile(year, filename)` for year-specific BURC paths; `requireOneDrive()` for fail-fast guard
 - The `General/` segment in `APAC Leadership Team - General/` is frequently dropped — always verify
 
 ## Critical: Environment Loading

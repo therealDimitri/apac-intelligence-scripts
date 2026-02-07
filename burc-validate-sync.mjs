@@ -26,6 +26,9 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import { BURC_BASE, requireOneDrive } from './lib/onedrive-paths.mjs'
+
+requireOneDrive()
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '..', '.env.local') });
@@ -760,7 +763,7 @@ async function main() {
 
   // Default to validating all recent files
   if (!filePath) {
-    const BURC_BASE = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC';
+    const BURC_BASE = BURC_BASE;
 
     const files = [
       { year: 2026, path: `${BURC_BASE}/2026/2026 APAC Performance.xlsx` },

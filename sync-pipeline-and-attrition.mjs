@@ -41,6 +41,9 @@ import XLSX from 'xlsx'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import dotenv from 'dotenv'
+import { BURC_MASTER_FILE, requireOneDrive } from './lib/onedrive-paths.mjs'
+
+requireOneDrive()
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 dotenv.config({ path: path.join(__dirname, '..', '.env.local') })
@@ -55,7 +58,7 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey)
 
-const BURC_FILE = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2026/2026 APAC Performance.xlsx'
+const BURC_FILE = BURC_MASTER_FILE
 
 // Probability weights by section COLOUR (for Dial 2 items)
 // Colours indicate probability, NOT forecast category

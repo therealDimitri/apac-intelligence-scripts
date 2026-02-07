@@ -4,8 +4,11 @@
  */
 
 import XLSX from 'xlsx'
+import { BURC_MASTER_FILE, requireOneDrive } from './lib/onedrive-paths.mjs'
 
-const filePath = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2026/2026 APAC Performance.xlsx'
+requireOneDrive()
+
+const filePath = BURC_MASTER_FILE
 const workbook = XLSX.readFile(filePath)
 
 const fmt = (v) => {

@@ -4,9 +4,12 @@
  */
 
 import XLSX from 'xlsx'
+import { burcFile, requireOneDrive } from './lib/onedrive-paths.mjs'
+
+requireOneDrive()
 
 const FILE_PATH =
-  '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2024/2024 APAC Performance.xlsx'
+  burcFile(2024, '2024 APAC Performance.xlsx')
 
 async function extract() {
   console.log('📊 Deep Extraction - FY2024 Revenue Data')

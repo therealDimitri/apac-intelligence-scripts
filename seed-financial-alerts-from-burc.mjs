@@ -9,13 +9,16 @@ import XLSX from 'xlsx';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import { burcFile, requireOneDrive } from './lib/onedrive-paths.mjs'
+
+requireOneDrive()
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '..', '.env.local') });
 
 const { Client } = pg;
 
-const BURC_PATH = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2026/Budget Planning/2026 APAC Performance.xlsx';
+const BURC_PATH = burcFile(2026, 'Budget Planning/2026 APAC Performance.xlsx');
 
 async function seedFinancialData() {
   const databaseUrl = process.env.DATABASE_URL_DIRECT || process.env.DATABASE_URL;

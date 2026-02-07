@@ -5,8 +5,11 @@
 
 import XLSX from 'xlsx';
 import fs from 'fs';
+import { ACTIVITY_REGISTER_2025, requireOneDrive } from './lib/onedrive-paths.mjs'
 
-const EXCEL_PATH = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Clients - Client Success/Client Segmentation/APAC Client Segmentation Activity Register 2025.xlsx';
+requireOneDrive()
+
+const EXCEL_PATH = ACTIVITY_REGISTER_2025;
 
 const buffer = fs.readFileSync(EXCEL_PATH);
 const workbook = XLSX.read(buffer, { type: 'buffer' });

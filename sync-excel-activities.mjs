@@ -20,6 +20,9 @@ import XLSX from 'xlsx'
 import path from 'path'
 import fs from 'fs'
 import { fileURLToPath } from 'url'
+import { ACTIVITY_REGISTER_2026, requireOneDrive } from './lib/onedrive-paths.mjs'
+
+requireOneDrive()
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -98,10 +101,7 @@ async function main() {
   console.log(`   Mode: ${dryRun ? 'DRY RUN' : 'LIVE'}\n`)
 
   // Excel file path
-  const excelPath = path.join(
-    process.env.HOME,
-    'Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Clients - Client Success/Client Segmentation/2026/APAC Client Segmentation Activity Register 2026.xlsx'
-  )
+  const excelPath = ACTIVITY_REGISTER_2026
 
   if (!fs.existsSync(excelPath)) {
     console.error(`❌ Excel file not found: ${excelPath}`)

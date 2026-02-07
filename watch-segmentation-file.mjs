@@ -19,12 +19,15 @@ import fs from 'fs'
 import path from 'path'
 import { spawn } from 'child_process'
 import { fileURLToPath } from 'url'
+import { ACTIVITY_REGISTER_2025, requireOneDrive } from './lib/onedrive-paths.mjs'
+
+requireOneDrive()
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 // Configuration
-const EXCEL_PATH = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Clients - Client Success/Client Segmentation/APAC Client Segmentation Activity Register 2025.xlsx'
+const EXCEL_PATH = ACTIVITY_REGISTER_2025
 const IMPORT_SCRIPT = path.join(__dirname, 'import-segmentation-events-2025.mjs')
 const DEBOUNCE_MS = 5000 // Wait 5 seconds after last change before importing
 

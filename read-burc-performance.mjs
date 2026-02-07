@@ -1,6 +1,9 @@
 import XLSX from 'xlsx'
+import { BURC_MASTER_FILE, requireOneDrive } from './lib/onedrive-paths.mjs'
 
-const wb = XLSX.readFile('/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2026/2026 APAC Performance.xlsx')
+requireOneDrive()
+
+const wb = XLSX.readFile(BURC_MASTER_FILE)
 
 // Check APAC BURC sheet
 console.log('=== APAC BURC Sheet ===\n')

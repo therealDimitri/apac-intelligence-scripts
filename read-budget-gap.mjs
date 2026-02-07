@@ -1,6 +1,9 @@
 import XLSX from 'xlsx'
+import { burcFile, requireOneDrive } from './lib/onedrive-paths.mjs'
 
-const wb = XLSX.readFile('/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2026/Budget Planning/APAC 2026 Budget GAP_ver3.xlsx')
+requireOneDrive()
+
+const wb = XLSX.readFile(burcFile(2026, 'Budget Planning/APAC 2026 Budget GAP_ver3.xlsx'))
 
 console.log('Sheet names:', wb.SheetNames)
 

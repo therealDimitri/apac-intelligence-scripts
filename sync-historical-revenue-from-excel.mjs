@@ -13,6 +13,9 @@ import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import XLSX from 'xlsx';
 import path from 'path';
+import { burcFile, requireOneDrive } from './lib/onedrive-paths.mjs'
+
+requireOneDrive()
 
 dotenv.config({ path: '.env.local' });
 
@@ -75,10 +78,7 @@ async function syncHistoricalRevenue() {
   console.log('');
 
   // Read Excel file - Updated path to Budget Planning folder
-  const excelPath = path.join(
-    process.env.HOME,
-    'Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2025/Budget Planning/APAC revenue analysis 2019 through present.xlsx'
-  );
+  const excelPath = burcFile(2025, 'Budget Planning/APAC revenue analysis 2019 through present.xlsx');
 
   console.log('Reading:', excelPath);
   const wb = XLSX.readFile(excelPath);

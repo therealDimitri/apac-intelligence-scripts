@@ -2,6 +2,9 @@ import XLSX from 'xlsx';
 import { createClient } from '@supabase/supabase-js';
 import { config } from 'dotenv';
 import { resolve } from 'path';
+import { BURC_MASTER_FILE, requireOneDrive } from './lib/onedrive-paths.mjs'
+
+requireOneDrive()
 
 config({ path: resolve(process.cwd(), '.env.local') });
 
@@ -10,7 +13,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-const burcPath = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2026/2026 APAC Performance.xlsx';
+const burcPath = BURC_MASTER_FILE;
 
 const workbook = XLSX.readFile(burcPath);
 const burcSheet = workbook.Sheets['APAC BURC'];

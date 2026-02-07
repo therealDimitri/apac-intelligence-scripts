@@ -13,6 +13,9 @@ import fs from 'fs';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { ACTIVITY_REGISTER_2025, requireOneDrive } from './lib/onedrive-paths.mjs'
+
+requireOneDrive()
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -21,7 +24,7 @@ const __dirname = dirname(__filename);
 dotenv.config({ path: join(__dirname, '../.env.local') });
 
 // Configuration - SECURITY: Use environment variables for secrets
-const EXCEL_PATH = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Clients - Client Success/Client Segmentation/APAC Client Segmentation Activity Register 2025.xlsx';
+const EXCEL_PATH = ACTIVITY_REGISTER_2025;
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace('https://', '') || '';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 

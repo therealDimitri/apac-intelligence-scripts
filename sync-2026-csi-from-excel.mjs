@@ -8,6 +8,9 @@
 import XLSX from 'xlsx';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import { BURC_MASTER_FILE, requireOneDrive } from './lib/onedrive-paths.mjs'
+
+requireOneDrive()
 
 dotenv.config({ path: '.env.local' });
 
@@ -16,7 +19,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-const EXCEL_PATH = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2026/2026 APAC Performance.xlsx';
+const EXCEL_PATH = BURC_MASTER_FILE;
 
 // Column mapping: C=Jan(1), D=Feb(2), ... N=Dec(12)
 const MONTH_COLS = {

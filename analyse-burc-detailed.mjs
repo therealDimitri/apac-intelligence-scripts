@@ -7,10 +7,13 @@
 import XLSX from 'xlsx';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { burcFile, requireOneDrive } from './lib/onedrive-paths.mjs'
+
+requireOneDrive()
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const BURC_PATH = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2026/Budget Planning/2026 APAC Performance.xlsx';
+const BURC_PATH = burcFile(2026, 'Budget Planning/2026 APAC Performance.xlsx');
 
 async function analyseBURC() {
   console.log('📊 Loading BURC file...');

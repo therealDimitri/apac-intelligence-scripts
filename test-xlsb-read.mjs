@@ -5,8 +5,11 @@
 
 import XLSX from 'xlsx'
 import fs from 'fs'
+import { BURC_BASE, burcFile, requireOneDrive } from './lib/onedrive-paths.mjs'
 
-const filePath = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2023/Dec 23/2023 12 BURC File.xlsb'
+requireOneDrive()
+
+const filePath = burcFile(2023, 'Dec 23/2023 12 BURC File.xlsb')
 
 console.log('Testing XLSB file read...')
 console.log('File exists:', fs.existsSync(filePath))
@@ -14,8 +17,8 @@ console.log('File exists:', fs.existsSync(filePath))
 if (!fs.existsSync(filePath)) {
   // Try alternative paths
   const altPaths = [
-    '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2023/2023 12 BURC File.xlsb',
-    '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2023/Dec/2023 12 BURC File.xlsb'
+    burcFile(2023, '2023 12 BURC File.xlsb'),
+    burcFile(2023, 'Dec/2023 12 BURC File.xlsb')
   ]
 
   for (const alt of altPaths) {
@@ -25,7 +28,7 @@ if (!fs.existsSync(filePath)) {
   }
 
   // List 2023 folder contents
-  const folder2023 = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2023'
+  const folder2023 = `${BURC_BASE}/2023`
   if (fs.existsSync(folder2023)) {
     console.log('\n2023 folder contents:')
     const contents = fs.readdirSync(folder2023)

@@ -11,6 +11,9 @@ import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { CLIENT_SUCCESS, requireOneDrive } from './lib/onedrive-paths.mjs'
+
+requireOneDrive()
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -28,7 +31,7 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const EXCEL_PATH = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Clients - Client Success/NPS/Data/Global/Q4.25 NPS Comments_Global.xlsx';
+const EXCEL_PATH = `${CLIENT_SUCCESS}/NPS/Data/Global/Q4.25 NPS Comments_Global.xlsx`;
 
 // Normalise text for comparison
 function normaliseText(text) {

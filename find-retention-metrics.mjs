@@ -1,6 +1,9 @@
 import XLSX from 'xlsx';
+import { burcFile, requireOneDrive } from './lib/onedrive-paths.mjs'
 
-const burcPath = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2025/2025 APAC Performance.xlsx';
+requireOneDrive()
+
+const burcPath = burcFile(2025, '2025 APAC Performance.xlsx');
 
 const workbook = XLSX.readFile(burcPath);
 

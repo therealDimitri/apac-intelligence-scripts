@@ -1,6 +1,9 @@
 import XLSX from 'xlsx';
+import { BURC_MASTER_FILE, requireOneDrive } from './lib/onedrive-paths.mjs'
 
-const burcPath = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2026/2026 APAC Performance.xlsx';
+requireOneDrive()
+
+const burcPath = BURC_MASTER_FILE;
 
 const workbook = XLSX.readFile(burcPath);
 const compSheet = workbook.Sheets['26 vs 25 Q Comparison'];

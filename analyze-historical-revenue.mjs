@@ -4,8 +4,11 @@
  */
 
 import XLSX from 'xlsx'
+import { BURC_BASE, requireOneDrive } from './lib/onedrive-paths.mjs'
 
-const filePath = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/APAC Revenue 2019 - 2024.xlsx'
+requireOneDrive()
+
+const filePath = `${BURC_BASE}/APAC Revenue 2019 - 2024.xlsx`
 
 const fmt = (v) => {
   if (v === undefined || v === null || isNaN(v)) return ''

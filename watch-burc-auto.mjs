@@ -33,6 +33,9 @@ import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import { BURC_BASE, requireOneDrive } from './lib/onedrive-paths.mjs'
+
+requireOneDrive()
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '..', '.env.local') });
@@ -46,7 +49,7 @@ const supabase = createClient(
 // Configuration
 // ============================================================================
 
-const BURC_BASE = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC';
+const BURC_BASE = BURC_BASE;
 
 const WATCH_PATHS = [
   `${BURC_BASE}/2026/**/*.xlsx`,
