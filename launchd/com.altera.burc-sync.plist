@@ -8,11 +8,11 @@
     <key>ProgramArguments</key>
     <array>
         <string>/usr/local/bin/node</string>
-        <string>/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Clients - Client Success/CS Connect Meetings/Sandbox/apac-intelligence-v2/scripts/sync-burc-data-supabase.mjs</string>
+        <string>/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/Documents/GitHub/apac-intelligence-v2/scripts/sync-burc-data-supabase.mjs</string>
     </array>
 
     <key>WorkingDirectory</key>
-    <string>/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth(2)/APAC Clients - Client Success/CS Connect Meetings/Sandbox/apac-intelligence-v2</string>
+    <string>/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/Documents/GitHub/apac-intelligence-v2</string>
 
     <key>StartInterval</key>
     <integer>3600</integer>

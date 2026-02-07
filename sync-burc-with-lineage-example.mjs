@@ -231,7 +231,7 @@ class LineageTracker {
 // ============================================================================
 
 async function syncEbitaWithLineage() {
-  const BURC_PATH = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - Performance/Financials/BURC/2026/Budget Planning/2026 APAC Performance.xlsx';
+  const BURC_PATH = '/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC/2026/Budget Planning/2026 APAC Performance.xlsx';
 
   console.log('📊 Starting BURC sync with data lineage tracking...\n');
 
