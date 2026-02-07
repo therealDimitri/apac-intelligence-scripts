@@ -11,7 +11,8 @@ import XLSX from 'xlsx';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-import { BURC_MASTER_FILE, requireOneDrive } from './lib/onedrive-paths.mjs'
+import { BURC_MASTER_FILE, FISCAL_YEAR, PREV_FISCAL_YEAR, requireOneDrive } from './lib/onedrive-paths.mjs'
+import { findRows, getCellValue, requireCell } from './lib/excel-utils.mjs'
 
 requireOneDrive()
 
@@ -28,9 +29,10 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Source of truth for 2024 actuals, 2025 actuals, and 2026 forecasts
-// SharePoint: https://alteradh.sharepoint.com/teams/APACLeadershipTeam/Shared Documents/General/Performance/Financials/BURC/2026/2026 APAC Performance.xls
 const BURC_PATH = BURC_MASTER_FILE;
+const FY_SHORT = String(FISCAL_YEAR).slice(-2);
+const PREV_FY_SHORT = String(PREV_FISCAL_YEAR).slice(-2);
+const COMP_SHEET_NAME = `${FY_SHORT} vs ${PREV_FY_SHORT} Q Comparison`;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 async function syncBurcData() {
@@ -51,8 +53,8 @@ async function syncBurcData() {
     console.log('');
 
     // Sync all data - ORDER MATTERS: Annual Financials first as it's the source of truth
-    // All 2026 data comes from APAC BURC sheet (except FY2025 which comes from comparison sheet)
-    await syncAnnualFinancials(workbook);  // FY2025/2026 gross revenue
+    // All FY data comes from APAC BURC sheet (except prior year from comparison sheet)
+    await syncAnnualFinancials(workbook);  // FY gross revenue
     await syncCSIRatios(workbook);         // CSI ratios from APAC BURC
     await syncEbitaData(workbook);         // EBITA from APAC BURC Row 100-101
     await syncOpexData(workbook);          // OPEX from APAC BURC Rows 71-98
@@ -82,81 +84,81 @@ async function syncBurcData() {
 }
 
 /**
- * Sync Annual Financials from multiple sheets using direct cell references:
+ * Sync Annual Financials from multiple sheets using direct cell references.
+ * See docs/burc-cell-mapping.md for the full cell reference map.
  *
- * FY2026 Forecasts (Column U):
- * - Gross Revenue: Cell U36 ($31.6M)
- * - Maintenance ARR: Cell U60 ($15.9M)
- * - EBITA: Cell U101 ($6.2M)
- *
- * FY2026 Targets (Column W):
- * - Gross Revenue: Cell W36 ($30.9M)
- * - Maintenance ARR: Cell W60 ($18.1M)
- * - EBITA: Cell W101 ($6.2M)
- *
- * FY2025 Actual: 26 vs 25 Q Comparison sheet, Cell P14 ($26.345M)
+ * Forecasts (Column U): U36 (Gross Revenue), U60 (Maintenance ARR), U101 (EBITA)
+ * Targets (Column W): W36, W60, W101
+ * Prior year: Comparison sheet Cell P14
  */
 async function syncAnnualFinancials(workbook) {
-  console.log('💵 Extracting Annual Financials (using direct cell references)...');
+  console.log(`💵 Extracting FY${FISCAL_YEAR} Annual Financials (using direct cell references)...`);
 
-  let fy2026GrossRevenue = null;
-  let fy2026TargetGrossRevenue = null;
-  let fy2026TargetArr = null;
-  let fy2026TargetEbita = null;
-  let fy2025Total = null;
+  let fyGrossRevenue = null;
+  let fyTargetGrossRevenue = null;
+  let fyTargetArr = null;
+  let fyTargetEbita = null;
+  let prevFyTotal = null;
 
-  // === FY2026: From APAC BURC sheet ===
+  // === Current FY: From APAC BURC sheet ===
   const apacSheet = workbook.Sheets['APAC BURC'];
   if (apacSheet) {
-    // Gross Revenue (Row 36)
-    const cellU36 = apacSheet['U36']?.v; // FY2026 Forecast
-    const cellW36 = apacSheet['W36']?.v; // FY2026 Target
-    const cellA36 = apacSheet['A36']?.v; // Row label
+    // Find rows by label — survives row insertions/deletions
+    const rows = findRows(apacSheet, 'A', [
+      { key: 'grossRevenue', pattern: /^Total Gross Revenue/i },
+      { key: 'maintenanceArr', pattern: /^Ending ARR|^Maintenance.*ARR/i },
+      { key: 'ebita', pattern: /^EBITA$/i },
+    ], 'APAC BURC');
 
-    // Maintenance ARR (Row 60)
-    const cellU60 = apacSheet['U60']?.v; // FY2026 Forecast ARR
-    const cellW60 = apacSheet['W60']?.v; // FY2026 Target ARR
-    const cellA60 = apacSheet['A60']?.v; // Row label
+    // Read forecast (Column U) and target (Column W) from discovered rows
+    const cellU_gr = requireCell(apacSheet, `U${rows.grossRevenue}`, 'Gross Revenue Forecast');
+    const cellW_gr = getCellValue(apacSheet, `W${rows.grossRevenue}`);
+    const labelGr = getCellValue(apacSheet, `A${rows.grossRevenue}`, 'Gross Revenue');
 
-    // EBITA (Row 101)
-    const cellU101 = apacSheet['U101']?.v; // FY2026 Forecast EBITA
-    const cellW101 = apacSheet['W101']?.v; // FY2026 Target EBITA
-    const cellA101 = apacSheet['A101']?.v; // Row label
+    const cellU_arr = requireCell(apacSheet, `U${rows.maintenanceArr}`, 'Maintenance ARR Forecast');
+    const cellW_arr = getCellValue(apacSheet, `W${rows.maintenanceArr}`);
+    const labelArr = getCellValue(apacSheet, `A${rows.maintenanceArr}`, 'Maintenance ARR');
 
-    if (cellU36 && typeof cellU36 === 'number') {
-      fy2026GrossRevenue = cellU36;
-      fy2026TargetGrossRevenue = typeof cellW36 === 'number' ? cellW36 : null;
-      console.log(`   Gross Revenue (${cellA36}):`);
-      console.log(`     Forecast (U36): $${(fy2026GrossRevenue / 1000000).toFixed(3)}M`);
-      console.log(`     Target (W36):   $${(fy2026TargetGrossRevenue / 1000000).toFixed(3)}M`);
+    const cellU_eb = requireCell(apacSheet, `U${rows.ebita}`, 'EBITA Forecast');
+    const cellW_eb = getCellValue(apacSheet, `W${rows.ebita}`);
+    const labelEb = getCellValue(apacSheet, `A${rows.ebita}`, 'EBITA');
+
+    console.log(`   Row discovery: Gross Revenue=row ${rows.grossRevenue}, ARR=row ${rows.maintenanceArr}, EBITA=row ${rows.ebita}`);
+
+    if (typeof cellU_gr === 'number') {
+      fyGrossRevenue = cellU_gr;
+      fyTargetGrossRevenue = typeof cellW_gr === 'number' ? cellW_gr : null;
+      console.log(`   Gross Revenue (${labelGr}):`);
+      console.log(`     Forecast: $${(fyGrossRevenue / 1000000).toFixed(3)}M`);
+      console.log(`     Target:   $${(fyTargetGrossRevenue / 1000000).toFixed(3)}M`);
     }
 
-    if (cellW60 && typeof cellW60 === 'number') {
-      fy2026TargetArr = cellW60;
-      console.log(`   Maintenance ARR (${cellA60}):`);
-      console.log(`     Forecast (U60): $${(cellU60 / 1000000).toFixed(3)}M`);
-      console.log(`     Target (W60):   $${(fy2026TargetArr / 1000000).toFixed(3)}M`);
+    if (cellW_arr && typeof cellW_arr === 'number') {
+      fyTargetArr = cellW_arr;
+      console.log(`   Maintenance ARR (${labelArr}):`);
+      console.log(`     Forecast: $${(cellU_arr / 1000000).toFixed(3)}M`);
+      console.log(`     Target:   $${(fyTargetArr / 1000000).toFixed(3)}M`);
     }
 
-    if (cellW101 && typeof cellW101 === 'number') {
-      fy2026TargetEbita = cellW101;
-      console.log(`   EBITA (${cellA101}):`);
-      console.log(`     Forecast (U101): $${(cellU101 / 1000000).toFixed(3)}M`);
-      console.log(`     Target (W101):   $${(fy2026TargetEbita / 1000000).toFixed(3)}M`);
+    if (cellW_eb && typeof cellW_eb === 'number') {
+      fyTargetEbita = cellW_eb;
+      console.log(`   EBITA (${labelEb}):`);
+      console.log(`     Forecast: $${(cellU_eb / 1000000).toFixed(3)}M`);
+      console.log(`     Target:   $${(fyTargetEbita / 1000000).toFixed(3)}M`);
     }
   } else {
     console.log('   ⚠️ Sheet not found: APAC BURC');
   }
 
-  // === FY2025: From 26 vs 25 Q Comparison sheet, Row 14 ===
-  const compSheet = workbook.Sheets['26 vs 25 Q Comparison'];
+  // === Prior FY: From comparison sheet, Row 14 ===
+  const compSheet = workbook.Sheets[COMP_SHEET_NAME];
   if (compSheet) {
     const cellP14 = compSheet['P14']?.v;
     const cellA14 = compSheet['A14']?.v;
 
     if (cellP14 && typeof cellP14 === 'number') {
-      fy2025Total = cellP14;
-      console.log(`   FY2025 Actual (${cellA14}): $${(fy2025Total / 1000000).toFixed(3)}M`);
+      prevFyTotal = cellP14;
+      console.log(`   FY${PREV_FISCAL_YEAR} Actual (${cellA14}): $${(prevFyTotal / 1000000).toFixed(3)}M`);
     }
   }
 
@@ -164,7 +166,7 @@ async function syncAnnualFinancials(workbook) {
   const { data: currentData } = await supabase
     .from('burc_annual_financials')
     .select('ending_arr')
-    .eq('fiscal_year', 2026)
+    .eq('fiscal_year', FISCAL_YEAR)
     .single();
 
   const endingArr = currentData?.ending_arr || 0;
@@ -173,8 +175,8 @@ async function syncAnnualFinancials(workbook) {
   let arrVariancePercent = null;
   let arrRiskStatus = 'Unknown';
 
-  if (fy2026TargetArr && endingArr) {
-    arrVariancePercent = ((endingArr - fy2026TargetArr) / fy2026TargetArr) * 100;
+  if (fyTargetArr && endingArr) {
+    arrVariancePercent = ((endingArr - fyTargetArr) / fyTargetArr) * 100;
 
     if (arrVariancePercent >= 0) {
       arrRiskStatus = 'On Track';
@@ -187,46 +189,46 @@ async function syncAnnualFinancials(workbook) {
     console.log(`   ARR Variance: ${arrVariancePercent.toFixed(1)}% (${arrRiskStatus})`);
   }
 
-  // Update burc_annual_financials table for FY2026
-  if (fy2026GrossRevenue) {
+  // Update burc_annual_financials table for current FY
+  if (fyGrossRevenue) {
     const updatePayload = {
-      gross_revenue: fy2026GrossRevenue,
-      target_gross_revenue: fy2026TargetGrossRevenue,
-      target_arr: fy2026TargetArr,
-      target_ebita: fy2026TargetEbita,
+      gross_revenue: fyGrossRevenue,
+      target_gross_revenue: fyTargetGrossRevenue,
+      target_arr: fyTargetArr,
+      target_ebita: fyTargetEbita,
       arr_variance_percent: arrVariancePercent,
       arr_risk_status: arrRiskStatus,
-      source_file: '2026 APAC Performance.xlsx (APAC BURC sheet)',
+      source_file: `${FISCAL_YEAR} APAC Performance.xlsx (APAC BURC sheet)`,
       updated_at: new Date().toISOString()
     };
 
-    const { error: error2026 } = await supabase
+    const { error: errorFy } = await supabase
       .from('burc_annual_financials')
       .update(updatePayload)
-      .eq('fiscal_year', 2026);
+      .eq('fiscal_year', FISCAL_YEAR);
 
-    if (error2026) {
-      console.error('   ❌ FY2026 update error:', error2026.message);
+    if (errorFy) {
+      console.error(`   ❌ FY${FISCAL_YEAR} update error:`, errorFy.message);
     } else {
-      console.log(`   ✅ FY2026 updated with forecasts and targets`);
+      console.log(`   ✅ FY${FISCAL_YEAR} updated with forecasts and targets`);
     }
   }
 
-  // Update FY2025
-  if (fy2025Total && typeof fy2025Total === 'number') {
-    const { error: error2025 } = await supabase
+  // Update prior FY
+  if (prevFyTotal && typeof prevFyTotal === 'number') {
+    const { error: errorPrevFy } = await supabase
       .from('burc_annual_financials')
       .update({
-        gross_revenue: fy2025Total,
-        source_file: '2026 APAC Performance.xlsx (26 vs 25 Q Comparison, Cell P14)',
+        gross_revenue: prevFyTotal,
+        source_file: `${FISCAL_YEAR} APAC Performance.xlsx (${COMP_SHEET_NAME}, Cell P14)`,
         updated_at: new Date().toISOString()
       })
-      .eq('fiscal_year', 2025);
+      .eq('fiscal_year', PREV_FISCAL_YEAR);
 
-    if (error2025) {
-      console.error('   ❌ FY2025 update error:', error2025.message);
+    if (errorPrevFy) {
+      console.error(`   ❌ FY${PREV_FISCAL_YEAR} update error:`, errorPrevFy.message);
     } else {
-      console.log(`   ✅ FY2025 updated: $${(fy2025Total / 1000000).toFixed(3)}M`);
+      console.log(`   ✅ FY${PREV_FISCAL_YEAR} updated: $${(prevFyTotal / 1000000).toFixed(3)}M`);
     }
   }
 }
@@ -263,8 +265,8 @@ async function syncCSIRatios(workbook) {
     ga_ratio: 126,          // Administration <=20%
   };
 
-  // Delete existing 2026 CSI data
-  const { error: delError } = await supabase.from('burc_csi_ratios').delete().eq('year', 2026);
+  // Delete existing FY CSI data
+  const { error: delError } = await supabase.from('burc_csi_ratios').delete().eq('year', FISCAL_YEAR);
   if (delError) {
     console.log('   ⚠️ Delete error:', delError.message);
   }
@@ -289,7 +291,7 @@ async function syncCSIRatios(workbook) {
     };
 
     records.push({
-      year: 2026,
+      year: FISCAL_YEAR,
       month_num: monthNum,
       // Store as multiplier values (e.g., 4.6 for 460%)
       maintenance_ratio: maintenance ?? null,
@@ -314,7 +316,7 @@ async function syncCSIRatios(workbook) {
   } else {
     // Show sample values
     const sample = records[0];
-    console.log(`   Jan 2026: Maint=${(sample.maintenance_ratio * 100).toFixed(1)}% PS=${(sample.ps_ratio * 100).toFixed(1)}% Sales=${(sample.sales_ratio * 100).toFixed(1)}% R&D=${(sample.rd_ratio * 100).toFixed(1)}% G&A=${(sample.ga_ratio * 100).toFixed(1)}%`);
+    console.log(`   Jan ${FISCAL_YEAR}: Maint=${(sample.maintenance_ratio * 100).toFixed(1)}% PS=${(sample.ps_ratio * 100).toFixed(1)}% Sales=${(sample.sales_ratio * 100).toFixed(1)}% R&D=${(sample.rd_ratio * 100).toFixed(1)}% G&A=${(sample.ga_ratio * 100).toFixed(1)}%`);
     console.log(`   ✅ 12 months of CSI ratios synced`);
   }
 }
@@ -325,7 +327,7 @@ async function syncCSIRatios(workbook) {
  * - Row 100: EBITA values (Actual and Forecast)
  * - Row 101: EBITA as % of Net Revenue
  * Columns: C=Jan, D=Feb, E=Mar, F=Apr, G=May, H=Jun, I=Jul, J=Aug, K=Sep, L=Oct, M=Nov, N=Dec
- * Column U = FY2026 Forecast Total, Column W = FY2026 Target/Budget
+ * Column U = FY Forecast Total, Column W = FY Target/Budget
  */
 async function syncEbitaData(workbook) {
   console.log('📈 Extracting EBITA data from APAC BURC...');
@@ -343,8 +345,8 @@ async function syncEbitaData(workbook) {
   const annualTarget = sheet['W100']?.v;
   const monthlyTarget = annualTarget ? annualTarget / 12 : null;
 
-  // Delete existing 2026 data
-  await supabase.from('burc_ebita_monthly').delete().eq('year', 2026);
+  // Delete existing FY data
+  await supabase.from('burc_ebita_monthly').delete().eq('year', FISCAL_YEAR);
 
   const records = [];
   for (let i = 0; i < 12; i++) {
@@ -358,7 +360,7 @@ async function syncEbitaData(workbook) {
     if (actual !== null && actual !== undefined) {
       const variance = monthlyTarget ? actual - monthlyTarget : actual;
       records.push({
-        year: 2026,
+        year: FISCAL_YEAR,
         month,
         month_num: i + 1,
         target_ebita: monthlyTarget,
@@ -377,7 +379,7 @@ async function syncEbitaData(workbook) {
   // Show sample values
   if (records.length > 0) {
     const sample = records[0];
-    console.log(`   Jan 2026: EBITA=$${(sample.actual_ebita / 1000).toFixed(0)}K (${((sample.ebita_percent || 0) * 100).toFixed(1)}% margin)`);
+    console.log(`   Jan ${FISCAL_YEAR}: EBITA=$${(sample.actual_ebita / 1000).toFixed(0)}K (${((sample.ebita_percent || 0) * 100).toFixed(1)}% margin)`);
   }
   console.log(`   ✅ ${records.length} months of EBITA data synced`);
 }
@@ -415,8 +417,8 @@ async function syncOpexData(workbook) {
     total_opex: 98,     // Total OPEX
   };
 
-  // Delete existing 2026 OPEX data
-  const { error: delError } = await supabase.from('burc_opex_monthly').delete().eq('year', 2026);
+  // Delete existing FY OPEX data
+  const { error: delError } = await supabase.from('burc_opex_monthly').delete().eq('year', FISCAL_YEAR);
   if (delError && !delError.message.includes('does not exist')) {
     console.log('   ⚠️ Delete error:', delError.message);
   }
@@ -434,7 +436,7 @@ async function syncOpexData(workbook) {
     const total = sheet[col + '98']?.v;
 
     records.push({
-      year: 2026,
+      year: FISCAL_YEAR,
       month: MONTHS[monthNum - 1],
       month_num: monthNum,
       cs_opex: cs ?? null,
@@ -457,7 +459,7 @@ async function syncOpexData(workbook) {
     }
   } else {
     const sample = records[0];
-    console.log(`   Jan 2026: Total OPEX=$${((sample.total_opex || 0) / 1000).toFixed(0)}K`);
+    console.log(`   Jan ${FISCAL_YEAR}: Total OPEX=$${((sample.total_opex || 0) / 1000).toFixed(0)}K`);
     console.log(`   ✅ 12 months of OPEX data synced`);
   }
 }
@@ -484,8 +486,8 @@ async function syncCogsData(workbook) {
   // Column mapping: C=Jan(1), D=Feb(2), ..., N=Dec(12)
   const monthCols = ['C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'];
 
-  // Delete existing 2026 COGS data
-  const { error: delError } = await supabase.from('burc_cogs_monthly').delete().eq('year', 2026);
+  // Delete existing FY COGS data
+  const { error: delError } = await supabase.from('burc_cogs_monthly').delete().eq('year', FISCAL_YEAR);
   if (delError && !delError.message.includes('does not exist')) {
     console.log('   ⚠️ Delete error:', delError.message);
   }
@@ -502,7 +504,7 @@ async function syncCogsData(workbook) {
     const total = sheet[col + '56']?.v;
 
     records.push({
-      year: 2026,
+      year: FISCAL_YEAR,
       month: MONTHS[monthNum - 1],
       month_num: monthNum,
       license_cogs: license ?? null,
@@ -524,7 +526,7 @@ async function syncCogsData(workbook) {
     }
   } else {
     const sample = records[0];
-    console.log(`   Jan 2026: Total COGS=$${((sample.total_cogs || 0) / 1000).toFixed(0)}K`);
+    console.log(`   Jan ${FISCAL_YEAR}: Total COGS=$${((sample.total_cogs || 0) / 1000).toFixed(0)}K`);
     console.log(`   ✅ 12 months of COGS data synced`);
   }
 }
@@ -548,8 +550,8 @@ async function syncNetRevenueData(workbook) {
   // Column mapping: C=Jan(1), D=Feb(2), ..., N=Dec(12)
   const monthCols = ['C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'];
 
-  // Delete existing 2026 Net Revenue data
-  const { error: delError } = await supabase.from('burc_net_revenue_monthly').delete().eq('year', 2026);
+  // Delete existing FY Net Revenue data
+  const { error: delError } = await supabase.from('burc_net_revenue_monthly').delete().eq('year', FISCAL_YEAR);
   if (delError && !delError.message.includes('does not exist')) {
     console.log('   ⚠️ Delete error:', delError.message);
   }
@@ -566,7 +568,7 @@ async function syncNetRevenueData(workbook) {
     const total = sheet[col + '66']?.v;
 
     records.push({
-      year: 2026,
+      year: FISCAL_YEAR,
       month: MONTHS[monthNum - 1],
       month_num: monthNum,
       license_net: license ?? null,
@@ -588,7 +590,7 @@ async function syncNetRevenueData(workbook) {
     }
   } else {
     const sample = records[0];
-    console.log(`   Jan 2026: Total Net Revenue=$${((sample.total_net_revenue || 0) / 1000).toFixed(0)}K`);
+    console.log(`   Jan ${FISCAL_YEAR}: Total Net Revenue=$${((sample.total_net_revenue || 0) / 1000).toFixed(0)}K`);
     console.log(`   ✅ 12 months of Net Revenue data synced`);
   }
 }
@@ -615,8 +617,8 @@ async function syncGrossRevenueMonthly(workbook) {
   // Column mapping: C=Jan(1), D=Feb(2), ..., N=Dec(12)
   const monthCols = ['C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'];
 
-  // Delete existing 2026 monthly revenue data
-  const { error: delError } = await supabase.from('burc_gross_revenue_monthly').delete().eq('year', 2026);
+  // Delete existing FY monthly revenue data
+  const { error: delError } = await supabase.from('burc_gross_revenue_monthly').delete().eq('year', FISCAL_YEAR);
   if (delError && !delError.message.includes('does not exist')) {
     console.log('   ⚠️ Delete error:', delError.message);
   }
@@ -633,7 +635,7 @@ async function syncGrossRevenueMonthly(workbook) {
     const total = sheet[col + '36']?.v;
 
     records.push({
-      year: 2026,
+      year: FISCAL_YEAR,
       month: MONTHS[monthNum - 1],
       month_num: monthNum,
       license_revenue: license ?? null,
@@ -655,13 +657,13 @@ async function syncGrossRevenueMonthly(workbook) {
     }
   } else {
     const sample = records[0];
-    console.log(`   Jan 2026: Total Gross Revenue=$${((sample.total_gross_revenue || 0) / 1000).toFixed(0)}K`);
+    console.log(`   Jan ${FISCAL_YEAR}: Total Gross Revenue=$${((sample.total_gross_revenue || 0) / 1000).toFixed(0)}K`);
     console.log(`   ✅ 12 months of Gross Revenue data synced`);
   }
 }
 
 /**
- * Sync Quarterly Comparison from APAC BURC sheet for 2026 data
+ * Sync Quarterly Comparison from APAC BURC sheet for current FY data
  * Source rows (using direct cell references):
  * - Row 28: License Revenue
  * - Row 30: PS Revenue
@@ -704,7 +706,7 @@ async function syncQuarterlyComparison(workbook) {
     { row: 36, stream: 'gross_revenue' },
   ];
 
-  await supabase.from('burc_quarterly').delete().eq('year', 2026);
+  await supabase.from('burc_quarterly').delete().eq('year', FISCAL_YEAR);
 
   const records = [];
   const quarters = [
@@ -719,7 +721,7 @@ async function syncQuarterlyComparison(workbook) {
       const amount = getQuarterlySum(mapping.row, quarter.cols);
       if (amount !== 0) {
         records.push({
-          year: 2026,
+          year: FISCAL_YEAR,
           quarter: quarter.name,
           revenue_stream: mapping.stream,
           amount
@@ -967,7 +969,7 @@ async function syncPsPipeline(workbook) {
  * - Row 33: Maintenance Revenue
  * - Row 35: Hardware Revenue
  * - Row 36: Total Gross Revenue
- * Columns: C-E=Q1, F-H=Q2, I-K=Q3, L-N=Q4, U=FY2026 Forecast
+ * Columns: C-E=Q1, F-H=Q2, I-K=Q3, L-N=Q4, U=FY${FISCAL_YEAR} Forecast
  */
 async function syncRevenueStreams(workbook) {
   console.log('💰 Extracting revenue streams from APAC BURC...');
@@ -1030,7 +1032,7 @@ async function syncRevenueStreams(workbook) {
   // Show sample
   const grossRev = records.find(r => r.stream === 'Gross Revenue');
   if (grossRev) {
-    console.log(`   FY2026 Gross Revenue: $${(grossRev.annual_total / 1000000).toFixed(3)}M`);
+    console.log(`   FY${FISCAL_YEAR} Gross Revenue: $${(grossRev.annual_total / 1000000).toFixed(3)}M`);
   }
   console.log(`   ✅ ${records.length} revenue stream entries synced`);
 }
