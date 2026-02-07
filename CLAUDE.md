@@ -2,6 +2,12 @@
 
 Utility scripts submodule for the APAC Intelligence application. No npm install, no build, no tests, no deployment.
 
+## OneDrive Path Gotchas
+- Many scripts hardcode OneDrive paths to Excel files — these break when OneDrive is reconfigured or OS is re-imaged
+- Correct BURC base: `/Users/jimmy.leimonitis/Library/CloudStorage/OneDrive-AlteraDigitalHealth/APAC Leadership Team - General/Performance/Financials/BURC`
+- Audit all paths: `grep -r "OneDrive" --include="*.mjs" .`
+- The `General/` segment in `APAC Leadership Team - General/` is frequently dropped — always verify
+
 ## Critical: Environment Loading
 
 Scripts load `.env.local` from the **parent directory**, not this directory:
