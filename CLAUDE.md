@@ -10,6 +10,15 @@ Utility scripts submodule for the APAC Intelligence application. No npm install,
 - `burcFile(year, filename)` for year-specific BURC paths; `requireOneDrive()` for fail-fast guard
 - The `General/` segment in `APAC Leadership Team - General/` is frequently dropped — always verify
 
+## Knowledge Base Reference
+
+Before working on scripts, read the relevant sections in `../docs/knowledge-base/`:
+- `02-data-pipeline/sync-architecture.md` — Data flow overview, automation status, cron routes
+- `02-data-pipeline/burc-sync.md` — BURC Excel cell references (U36, U60, U101), 12 target tables, fragility points
+- `02-data-pipeline/data-quality.md` — Client name resolution, staleness thresholds, known issues
+- `06-database/gotchas.md` — 15 column name traps (capitalized columns, wrong field names)
+- `07-infrastructure/scripts-submodule.md` — Submodule commit workflow
+
 ## Critical: Environment Loading
 
 Scripts load `.env.local` from the **parent directory**, not this directory:
