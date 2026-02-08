@@ -18,7 +18,8 @@ import XLSX from 'xlsx';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-import { BURC_MASTER_FILE, requireOneDrive } from './lib/onedrive-paths.mjs'
+import { BURC_MASTER_FILE, FISCAL_YEAR, PREV_FISCAL_YEAR, requireOneDrive } from './lib/onedrive-paths.mjs'
+import { BURC_CLIENT_NAMES } from './lib/client-names.mjs'
 
 requireOneDrive()
 
@@ -205,7 +206,7 @@ async function syncEbitaData(client, workbook) {
   });
 
   // Clear existing data for this year
-  await client.query('DELETE FROM burc_ebita_monthly WHERE year = 2026');
+  await client.query('DELETE FROM burc_ebita_monthly WHERE year = $1', [FISCAL_YEAR]);
 
   let insertCount = 0;
   for (let i = 0; i < 12; i++) {
@@ -221,14 +222,14 @@ async function syncEbitaData(client, workbook) {
 
       await client.query(`
         INSERT INTO burc_ebita_monthly (year, month, month_num, target_ebita, actual_ebita, variance, ebita_percent)
-        VALUES (2026, $1, $2, $3, $4, $5, $6)
+        VALUES ($7, $1, $2, $3, $4, $5, $6)
         ON CONFLICT (year, month_num) DO UPDATE SET
           target_ebita = EXCLUDED.target_ebita,
           actual_ebita = EXCLUDED.actual_ebita,
           variance = EXCLUDED.variance,
           ebita_percent = EXCLUDED.ebita_percent,
           updated_at = NOW()
-      `, [month, i + 1, target, actual, variance, ebitaPct]);
+      `, [month, i + 1, target, actual, variance, ebitaPct, FISCAL_YEAR]);
       insertCount++;
     }
   }
@@ -239,9 +240,12 @@ async function syncEbitaData(client, workbook) {
 async function syncQuarterlyComparison(client, workbook) {
   console.log('📊 Extracting quarterly comparison...');
 
-  const sheet = workbook.Sheets['26 vs 25 Q Comparison'];
+  const FY_SHORT = String(FISCAL_YEAR).slice(-2);
+  const PREV_FY_SHORT = String(PREV_FISCAL_YEAR).slice(-2);
+  const compSheetName = `${FY_SHORT} vs ${PREV_FY_SHORT} Q Comparison`;
+  const sheet = workbook.Sheets[compSheetName];
   if (!sheet) {
-    console.log('   ⚠️ Sheet not found: 26 vs 25 Q Comparison');
+    console.log(`   ⚠️ Sheet not found: ${compSheetName}`);
     return;
   }
 
@@ -257,8 +261,8 @@ async function syncQuarterlyComparison(client, workbook) {
     'Gross Revenue': 'gross_revenue'
   };
 
-  // Clear existing 2026 data
-  await client.query('DELETE FROM burc_quarterly WHERE year = 2026');
+  // Clear existing FY data
+  await client.query('DELETE FROM burc_quarterly WHERE year = $1', [FISCAL_YEAR]);
 
   let insertCount = 0;
   for (const row of data) {
@@ -269,14 +273,14 @@ async function syncQuarterlyComparison(client, workbook) {
 
       for (let q = 0; q < 4; q++) {
         const amount = row[3 + q]; // Q1 starts at column index 3
-        if (amount !== undefined && amount !== null) {
+        if (amount !== undefined && amount !== null && typeof amount === 'number') {
           await client.query(`
             INSERT INTO burc_quarterly (year, quarter, revenue_stream, amount)
-            VALUES (2026, $1, $2, $3)
+            VALUES ($4, $1, $2, $3)
             ON CONFLICT (year, quarter, revenue_stream) DO UPDATE SET
               amount = EXCLUDED.amount,
               updated_at = NOW()
-          `, [quarters[q], streamKey, amount]);
+          `, [quarters[q], streamKey, amount, FISCAL_YEAR]);
           insertCount++;
         }
       }
@@ -356,25 +360,8 @@ async function syncClientMaintenance(client, workbook) {
   let inDataSection = false;
   let insertCount = 0;
 
-  // Client code to full name mapping (all known clients in pivot table)
-  const CLIENT_NAMES = {
-    'AWH': 'Albury Wodonga Health',
-    'BWH': 'Barwon Health',
-    'EPH': 'Epworth Healthcare',
-    'GHA': 'Grampians Health Alliance',
-    'GHRA': 'GHA Regional',
-    'MAH': 'Mount Alvernia Hospital',
-    'NCS': 'NCS/MinDef',
-    'RVEEH': 'Royal Victorian Eye & Ear',
-    'SA Health': 'SA Health',
-    'WA Health': 'WA Health',
-    'SLMC': "St Luke's Medical Centre",
-    'Sing Health': 'Sing Health',
-    'Waikato': 'Waikato',
-    'Western Health': 'Western Health',
-    'GRMC': 'GRMC',
-    'Parkway': 'Parkway (Churned)'
-  };
+  // Known client codes — imported from shared canonical source
+  const CLIENT_NAMES = BURC_CLIENT_NAMES;
 
   // Category headers in the data section
   const CATEGORY_HEADERS = ['Best Case', 'Pipeline', 'Backlog', 'Bus Case', 'Business Case', 'Lost'];
@@ -520,9 +507,12 @@ async function syncPsPipeline(client, workbook) {
 async function syncRevenueStreams(client, workbook) {
   console.log('💰 Extracting revenue streams summary...');
 
-  const sheet = workbook.Sheets['26 vs 25 Q Comparison'];
+  const FY_SHORT = String(FISCAL_YEAR).slice(-2);
+  const PREV_FY_SHORT = String(PREV_FISCAL_YEAR).slice(-2);
+  const compSheetName = `${FY_SHORT} vs ${PREV_FY_SHORT} Q Comparison`;
+  const sheet = workbook.Sheets[compSheetName];
   if (!sheet) {
-    console.log('   ⚠️ Sheet not found: 26 vs 25 Q Comparison');
+    console.log(`   ⚠️ Sheet not found: ${compSheetName}`);
     return;
   }
 

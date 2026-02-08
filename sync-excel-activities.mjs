@@ -21,7 +21,7 @@ import XLSX from 'xlsx'
 import path from 'path'
 import fs from 'fs'
 import { fileURLToPath } from 'url'
-import { ACTIVITY_REGISTER_2026, requireOneDrive } from './lib/onedrive-paths.mjs'
+import { ACTIVITY_REGISTER_CURRENT, requireOneDrive } from './lib/onedrive-paths.mjs'
 import { createClientNameResolver } from './lib/resolve-client-names.mjs'
 import { createSyncLogger } from './lib/sync-logger.mjs'
 
@@ -110,7 +110,7 @@ async function main() {
   const syncLog = await createSyncLogger(supabase, 'activity_sync', dryRun ? 'manual_dry_run' : 'manual')
 
   // Excel file path
-  const excelPath = ACTIVITY_REGISTER_2026
+  const excelPath = ACTIVITY_REGISTER_CURRENT
 
   if (!fs.existsSync(excelPath)) {
     console.error(`❌ Excel file not found: ${excelPath}`)

@@ -12,7 +12,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { BURC_MASTER_FILE, FISCAL_YEAR, PREV_FISCAL_YEAR, requireOneDrive } from './lib/onedrive-paths.mjs'
-import { findRows, getCellValue, requireCell } from './lib/excel-utils.mjs'
+import { findRows, getCellValue, requireCell, readMonthlyRow, validateCellRefs } from './lib/excel-utils.mjs'
+import { BURC_CLIENT_NAMES } from './lib/client-names.mjs'
 import { createSyncLogger } from './lib/sync-logger.mjs'
 
 requireOneDrive()
@@ -160,8 +161,8 @@ async function syncAnnualFinancials(workbook) {
   // === Prior FY: From comparison sheet, Row 14 ===
   const compSheet = workbook.Sheets[COMP_SHEET_NAME];
   if (compSheet) {
-    const cellP14 = compSheet['P14']?.v;
-    const cellA14 = compSheet['A14']?.v;
+    const cellP14 = getCellValue(compSheet, 'P14');
+    const cellA14 = getCellValue(compSheet, 'A14', 'Prior FY');
 
     if (cellP14 && typeof cellP14 === 'number') {
       prevFyTotal = cellP14;
@@ -260,9 +261,6 @@ async function syncCSIRatios(workbook) {
     return;
   }
 
-  // Column mapping: C=Jan(1), D=Feb(2), ..., N=Dec(12)
-  const monthCols = ['C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'];
-
   // CSI Ratio row mappings (Excel rows)
   const csiConfig = {
     maintenance_ratio: 122, // Customer Service (>4)
@@ -272,6 +270,22 @@ async function syncCSIRatios(workbook) {
     ga_ratio: 126,          // Administration <=20%
   };
 
+  // Pre-flight: validate critical CSI rows exist
+  validateCellRefs(sheet, 'APAC BURC', [
+    { ref: 'A122', label: 'Customer Service ratio label' },
+    { ref: 'A123', label: 'Sales & Marketing ratio label' },
+    { ref: 'A124', label: 'R&D ratio label' },
+    { ref: 'A125', label: 'PS ratio label' },
+    { ref: 'A126', label: 'Administration ratio label' },
+  ]);
+
+  // Read monthly values for each CSI row
+  const maintRow = readMonthlyRow(sheet, csiConfig.maintenance_ratio);
+  const salesRow = readMonthlyRow(sheet, csiConfig.sales_ratio);
+  const rdRow = readMonthlyRow(sheet, csiConfig.rd_ratio);
+  const psRow = readMonthlyRow(sheet, csiConfig.ps_ratio);
+  const gaRow = readMonthlyRow(sheet, csiConfig.ga_ratio);
+
   // Delete existing FY CSI data
   const { error: delError } = await supabase.from('burc_csi_ratios').delete().eq('year', FISCAL_YEAR);
   if (delError) {
@@ -280,14 +294,11 @@ async function syncCSIRatios(workbook) {
 
   const records = [];
   for (let monthNum = 1; monthNum <= 12; monthNum++) {
-    const col = monthCols[monthNum - 1];
-
-    // Get CSI values from direct cell references
-    const maintenance = sheet[col + '122']?.v; // Customer Service
-    const sales = sheet[col + '123']?.v;       // Sales & Marketing
-    const rd = sheet[col + '124']?.v;          // R&D
-    const ps = sheet[col + '125']?.v;          // Professional Services
-    const ga = sheet[col + '126']?.v;          // Administration
+    const maintenance = maintRow[monthNum - 1];
+    const sales = salesRow[monthNum - 1];
+    const rd = rdRow[monthNum - 1];
+    const ps = psRow[monthNum - 1];
+    const ga = gaRow[monthNum - 1];
 
     // Determine status based on targets
     // Values are already as ratios (e.g., 4.6 means 460%, 0.25 means 25%)
@@ -345,12 +356,13 @@ async function syncEbitaData(workbook) {
     return;
   }
 
-  // Column mapping: C=Jan(1), D=Feb(2), ..., N=Dec(12)
-  const monthCols = ['C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'];
-
   // Get annual target from cell W100 (Budget/Target)
-  const annualTarget = sheet['W100']?.v;
+  const annualTarget = getCellValue(sheet, 'W100');
   const monthlyTarget = annualTarget ? annualTarget / 12 : null;
+
+  // Read monthly EBITA values using readMonthlyRow
+  const ebitaValues = readMonthlyRow(sheet, 100);
+  const ebitaPctValues = readMonthlyRow(sheet, 101);
 
   // Delete existing FY data
   await supabase.from('burc_ebita_monthly').delete().eq('year', FISCAL_YEAR);
@@ -358,11 +370,9 @@ async function syncEbitaData(workbook) {
   const records = [];
   for (let i = 0; i < 12; i++) {
     const month = MONTHS[i];
-    const col = monthCols[i];
 
-    // Direct cell references
-    const actual = sheet[col + '100']?.v;      // EBITA value
-    const ebitaPct = sheet[col + '101']?.v;    // EBITA as % of Net Revenue
+    const actual = ebitaValues[i];
+    const ebitaPct = ebitaPctValues[i];
 
     if (actual !== null && actual !== undefined) {
       const variance = monthlyTarget ? actual - monthlyTarget : actual;
@@ -411,9 +421,6 @@ async function syncOpexData(workbook) {
     return;
   }
 
-  // Column mapping: C=Jan(1), D=Feb(2), ..., N=Dec(12)
-  const monthCols = ['C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'];
-
   // OPEX category row mappings
   const opexConfig = {
     cs_opex: 71,        // Customer Service
@@ -424,6 +431,14 @@ async function syncOpexData(workbook) {
     total_opex: 98,     // Total OPEX
   };
 
+  // Read monthly values for each OPEX category
+  const csRow = readMonthlyRow(sheet, opexConfig.cs_opex);
+  const rdRow = readMonthlyRow(sheet, opexConfig.rd_opex);
+  const psRow = readMonthlyRow(sheet, opexConfig.ps_opex);
+  const salesRow = readMonthlyRow(sheet, opexConfig.sales_opex);
+  const gaRow = readMonthlyRow(sheet, opexConfig.ga_opex);
+  const totalRow = readMonthlyRow(sheet, opexConfig.total_opex);
+
   // Delete existing FY OPEX data
   const { error: delError } = await supabase.from('burc_opex_monthly').delete().eq('year', FISCAL_YEAR);
   if (delError && !delError.message.includes('does not exist')) {
@@ -432,26 +447,16 @@ async function syncOpexData(workbook) {
 
   const records = [];
   for (let monthNum = 1; monthNum <= 12; monthNum++) {
-    const col = monthCols[monthNum - 1];
-
-    // Get OPEX values from direct cell references
-    const cs = sheet[col + '71']?.v;
-    const rd = sheet[col + '76']?.v;
-    const ps = sheet[col + '82']?.v;
-    const sales = sheet[col + '88']?.v;
-    const ga = sheet[col + '95']?.v;
-    const total = sheet[col + '98']?.v;
-
     records.push({
       year: FISCAL_YEAR,
       month: MONTHS[monthNum - 1],
       month_num: monthNum,
-      cs_opex: cs ?? null,
-      rd_opex: rd ?? null,
-      ps_opex: ps ?? null,
-      sales_opex: sales ?? null,
-      ga_opex: ga ?? null,
-      total_opex: total ?? null,
+      cs_opex: csRow[monthNum - 1],
+      rd_opex: rdRow[monthNum - 1],
+      ps_opex: psRow[monthNum - 1],
+      sales_opex: salesRow[monthNum - 1],
+      ga_opex: gaRow[monthNum - 1],
+      total_opex: totalRow[monthNum - 1],
       calculated_at: new Date().toISOString()
     });
   }
@@ -490,35 +495,30 @@ async function syncCogsData(workbook) {
     return;
   }
 
-  // Column mapping: C=Jan(1), D=Feb(2), ..., N=Dec(12)
-  const monthCols = ['C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'];
-
   // Delete existing FY COGS data
   const { error: delError } = await supabase.from('burc_cogs_monthly').delete().eq('year', FISCAL_YEAR);
   if (delError && !delError.message.includes('does not exist')) {
     console.log('   ⚠️ Delete error:', delError.message);
   }
 
+  // Read monthly values for each COGS category
+  const licenseRow = readMonthlyRow(sheet, 38);
+  const psRow = readMonthlyRow(sheet, 40);
+  const maintRow = readMonthlyRow(sheet, 44);
+  const hwRow = readMonthlyRow(sheet, 47);
+  const totalRow = readMonthlyRow(sheet, 56);
+
   const records = [];
   for (let monthNum = 1; monthNum <= 12; monthNum++) {
-    const col = monthCols[monthNum - 1];
-
-    // Get COGS values from direct cell references
-    const license = sheet[col + '38']?.v;
-    const ps = sheet[col + '40']?.v;
-    const maintenance = sheet[col + '44']?.v;
-    const hardware = sheet[col + '47']?.v;
-    const total = sheet[col + '56']?.v;
-
     records.push({
       year: FISCAL_YEAR,
       month: MONTHS[monthNum - 1],
       month_num: monthNum,
-      license_cogs: license ?? null,
-      ps_cogs: ps ?? null,
-      maintenance_cogs: maintenance ?? null,
-      hardware_cogs: hardware ?? null,
-      total_cogs: total ?? null,
+      license_cogs: licenseRow[monthNum - 1],
+      ps_cogs: psRow[monthNum - 1],
+      maintenance_cogs: maintRow[monthNum - 1],
+      hardware_cogs: hwRow[monthNum - 1],
+      total_cogs: totalRow[monthNum - 1],
       calculated_at: new Date().toISOString()
     });
   }
@@ -554,35 +554,30 @@ async function syncNetRevenueData(workbook) {
     return;
   }
 
-  // Column mapping: C=Jan(1), D=Feb(2), ..., N=Dec(12)
-  const monthCols = ['C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'];
-
   // Delete existing FY Net Revenue data
   const { error: delError } = await supabase.from('burc_net_revenue_monthly').delete().eq('year', FISCAL_YEAR);
   if (delError && !delError.message.includes('does not exist')) {
     console.log('   ⚠️ Delete error:', delError.message);
   }
 
+  // Read monthly values for each Net Revenue category
+  const licenseRow = readMonthlyRow(sheet, 58);
+  const psRow = readMonthlyRow(sheet, 60);
+  const maintRow = readMonthlyRow(sheet, 63);
+  const hwRow = readMonthlyRow(sheet, 65);
+  const totalRow = readMonthlyRow(sheet, 66);
+
   const records = [];
   for (let monthNum = 1; monthNum <= 12; monthNum++) {
-    const col = monthCols[monthNum - 1];
-
-    // Get Net Revenue values (Total Net Revenue at row 66)
-    const license = sheet[col + '58']?.v;
-    const ps = sheet[col + '60']?.v;
-    const maintenance = sheet[col + '63']?.v;
-    const hardware = sheet[col + '65']?.v;
-    const total = sheet[col + '66']?.v;
-
     records.push({
       year: FISCAL_YEAR,
       month: MONTHS[monthNum - 1],
       month_num: monthNum,
-      license_net: license ?? null,
-      ps_net: ps ?? null,
-      maintenance_net: maintenance ?? null,
-      hardware_net: hardware ?? null,
-      total_net_revenue: total ?? null,
+      license_net: licenseRow[monthNum - 1],
+      ps_net: psRow[monthNum - 1],
+      maintenance_net: maintRow[monthNum - 1],
+      hardware_net: hwRow[monthNum - 1],
+      total_net_revenue: totalRow[monthNum - 1],
       calculated_at: new Date().toISOString()
     });
   }
@@ -621,35 +616,30 @@ async function syncGrossRevenueMonthly(workbook) {
     return;
   }
 
-  // Column mapping: C=Jan(1), D=Feb(2), ..., N=Dec(12)
-  const monthCols = ['C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'];
-
   // Delete existing FY monthly revenue data
   const { error: delError } = await supabase.from('burc_gross_revenue_monthly').delete().eq('year', FISCAL_YEAR);
   if (delError && !delError.message.includes('does not exist')) {
     console.log('   ⚠️ Delete error:', delError.message);
   }
 
+  // Read monthly values for each revenue category
+  const licenseRow = readMonthlyRow(sheet, 28);
+  const psRow = readMonthlyRow(sheet, 30);
+  const maintRow = readMonthlyRow(sheet, 33);
+  const hwRow = readMonthlyRow(sheet, 35);
+  const totalRow = readMonthlyRow(sheet, 36);
+
   const records = [];
   for (let monthNum = 1; monthNum <= 12; monthNum++) {
-    const col = monthCols[monthNum - 1];
-
-    // Get revenue values from direct cell references
-    const license = sheet[col + '28']?.v;
-    const ps = sheet[col + '30']?.v;
-    const maintenance = sheet[col + '33']?.v;
-    const hardware = sheet[col + '35']?.v;
-    const total = sheet[col + '36']?.v;
-
     records.push({
       year: FISCAL_YEAR,
       month: MONTHS[monthNum - 1],
       month_num: monthNum,
-      license_revenue: license ?? null,
-      ps_revenue: ps ?? null,
-      maintenance_revenue: maintenance ?? null,
-      hardware_revenue: hardware ?? null,
-      total_gross_revenue: total ?? null,
+      license_revenue: licenseRow[monthNum - 1],
+      ps_revenue: psRow[monthNum - 1],
+      maintenance_revenue: maintRow[monthNum - 1],
+      hardware_revenue: hwRow[monthNum - 1],
+      total_gross_revenue: totalRow[monthNum - 1],
       calculated_at: new Date().toISOString()
     });
   }
@@ -688,22 +678,6 @@ async function syncQuarterlyComparison(workbook) {
     return;
   }
 
-  // Helper to sum quarterly values from monthly cells
-  const getQuarterlySum = (row, qCols) => {
-    let sum = 0;
-    for (const col of qCols) {
-      const val = sheet[col + row]?.v;
-      if (typeof val === 'number') sum += val;
-    }
-    return sum;
-  };
-
-  // Quarter column mappings
-  const q1Cols = ['C', 'D', 'E'];  // Jan, Feb, Mar
-  const q2Cols = ['F', 'G', 'H'];  // Apr, May, Jun
-  const q3Cols = ['I', 'J', 'K'];  // Jul, Aug, Sep
-  const q4Cols = ['L', 'M', 'N'];  // Oct, Nov, Dec
-
   // Revenue stream row mappings
   const streamMappings = [
     { row: 28, stream: 'license' },
@@ -717,15 +691,16 @@ async function syncQuarterlyComparison(workbook) {
 
   const records = [];
   const quarters = [
-    { name: 'Q1', cols: q1Cols },
-    { name: 'Q2', cols: q2Cols },
-    { name: 'Q3', cols: q3Cols },
-    { name: 'Q4', cols: q4Cols },
+    { name: 'Q1', months: [0, 1, 2] },
+    { name: 'Q2', months: [3, 4, 5] },
+    { name: 'Q3', months: [6, 7, 8] },
+    { name: 'Q4', months: [9, 10, 11] },
   ];
 
   for (const mapping of streamMappings) {
+    const monthlyValues = readMonthlyRow(sheet, mapping.row);
     for (const quarter of quarters) {
-      const amount = getQuarterlySum(mapping.row, quarter.cols);
+      const amount = quarter.months.reduce((sum, i) => sum + (typeof monthlyValues[i] === 'number' ? monthlyValues[i] : 0), 0);
       if (amount !== 0) {
         records.push({
           year: FISCAL_YEAR,
@@ -821,26 +796,9 @@ async function syncClientMaintenance(workbook) {
   let currentCategory = null;
   const records = [];
 
-  // Known client codes - these are parent-level entries in the Excel hierarchy
+  // Known client codes — imported from shared canonical source
   // Child rows (like "Run Rate 25/26", "CPI - 5%") are detail breakdowns and should be skipped
-  const clientNames = {
-    'AWH': 'Albury Wodonga Health',
-    'BWH': 'Barwon Health',
-    'EPH': 'Epworth Healthcare',
-    'GHA': 'Grampians Health Alliance',
-    'GHRA': 'GHA Regional',
-    'MAH': 'Mount Alvernia Hospital',
-    'NCS': 'NCS/MinDef',
-    'RVEEH': 'Royal Victorian Eye & Ear',
-    'SA Health': 'SA Health',
-    'WA Health': 'WA Health',
-    'SLMC': "St Luke's Medical Centre",
-    'Parkway': 'Parkway (Churned)',
-    'GRMC': 'Grafton Base Hospital',
-    'Western Health': 'Western Health',
-    'RBWH': 'Royal Brisbane Hospital',
-    'Lost': 'Lost Revenue'
-  };
+  const clientNames = BURC_CLIENT_NAMES;
 
   // Track seen combinations to handle any remaining duplicates
   const seen = new Set();
@@ -987,22 +945,6 @@ async function syncRevenueStreams(workbook) {
     return;
   }
 
-  // Helper to sum quarterly values from monthly cells
-  const getQuarterlySum = (row, qCols) => {
-    let sum = 0;
-    for (const col of qCols) {
-      const val = sheet[col + row]?.v;
-      if (typeof val === 'number') sum += val;
-    }
-    return sum;
-  };
-
-  // Quarter column mappings
-  const q1Cols = ['C', 'D', 'E'];  // Jan, Feb, Mar
-  const q2Cols = ['F', 'G', 'H'];  // Apr, May, Jun
-  const q3Cols = ['I', 'J', 'K'];  // Jul, Aug, Sep
-  const q4Cols = ['L', 'M', 'N'];  // Oct, Nov, Dec
-
   // Revenue stream row mappings
   const streamMappings = [
     { row: 28, stream: 'License' },
@@ -1017,11 +959,12 @@ async function syncRevenueStreams(workbook) {
 
   const records = [];
   for (const mapping of streamMappings) {
-    const q1 = getQuarterlySum(mapping.row, q1Cols);
-    const q2 = getQuarterlySum(mapping.row, q2Cols);
-    const q3 = getQuarterlySum(mapping.row, q3Cols);
-    const q4 = getQuarterlySum(mapping.row, q4Cols);
-    const annual = sheet['U' + mapping.row]?.v || (q1 + q2 + q3 + q4);
+    const monthlyValues = readMonthlyRow(sheet, mapping.row);
+    const q1 = [0, 1, 2].reduce((s, i) => s + (typeof monthlyValues[i] === 'number' ? monthlyValues[i] : 0), 0);
+    const q2 = [3, 4, 5].reduce((s, i) => s + (typeof monthlyValues[i] === 'number' ? monthlyValues[i] : 0), 0);
+    const q3 = [6, 7, 8].reduce((s, i) => s + (typeof monthlyValues[i] === 'number' ? monthlyValues[i] : 0), 0);
+    const q4 = [9, 10, 11].reduce((s, i) => s + (typeof monthlyValues[i] === 'number' ? monthlyValues[i] : 0), 0);
+    const annual = getCellValue(sheet, `U${mapping.row}`) || (q1 + q2 + q3 + q4);
 
     records.push({
       stream: mapping.stream,

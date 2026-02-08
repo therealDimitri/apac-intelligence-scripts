@@ -8,11 +8,15 @@
 import XLSX from 'xlsx';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
-import { BURC_MASTER_FILE, requireOneDrive } from './lib/onedrive-paths.mjs'
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { BURC_MASTER_FILE, FISCAL_YEAR, requireOneDrive } from './lib/onedrive-paths.mjs'
+import { getCellValue as getCellVal } from './lib/excel-utils.mjs'
 
 requireOneDrive()
 
-dotenv.config({ path: '.env.local' });
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, '..', '.env.local') });
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -51,9 +55,8 @@ const ROWS = {
 };
 
 function getCellValue(sheet, col, row) {
-  const cell = sheet[col + row];
-  if (!cell) return 0;
-  return typeof cell.v === 'number' ? cell.v : 0;
+  const val = getCellVal(sheet, col + row, 0);
+  return typeof val === 'number' ? val : 0;
 }
 
 async function syncData() {
@@ -66,16 +69,16 @@ async function syncData() {
     process.exit(1);
   }
 
-  console.log('\nExtracting 2026 monthly data...\n');
+  console.log(`\nExtracting ${FISCAL_YEAR} monthly data...\n`);
 
   const monthlyData = [];
 
   for (let month = 1; month <= 12; month++) {
     const col = MONTH_COLS[month];
-    const monthName = new Date(2026, month - 1, 1).toLocaleString('en-AU', { month: 'short' });
+    const monthName = new Date(FISCAL_YEAR, month - 1, 1).toLocaleString('en-AU', { month: 'short' });
 
     const data = {
-      year: 2026,
+      year: FISCAL_YEAR,
       month_num: month,
       month: monthName,
       license_nr: getCellValue(sheet, col, ROWS.LICENSE_NR),

@@ -1,5 +1,6 @@
 import XLSX from 'xlsx';
 import { BURC_MASTER_FILE, requireOneDrive } from './lib/onedrive-paths.mjs'
+import { getCellValue } from './lib/excel-utils.mjs'
 
 requireOneDrive()
 
@@ -23,8 +24,7 @@ const cols = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 console.log('\n=== Row 55 (checking for month headers) ===');
 let row55 = [];
 cols.slice(0, 20).forEach(col => {
-  const cell = sheet[col + '55'];
-  row55.push(cell ? cell.v : '');
+  row55.push(getCellValue(sheet, col + '55', ''));
 });
 console.log(row55.join(' | '));
 
@@ -34,8 +34,8 @@ const ratioRows = [121, 122, 123, 124, 125, 126, 127, 128, 129];
 ratioRows.forEach(row => {
   let rowData = [];
   cols.slice(0, 20).forEach(col => {
-    const cell = sheet[col + row];
-    rowData.push(cell ? (typeof cell.v === 'number' ? cell.v.toFixed(2) : cell.v) : '');
+    const val = getCellValue(sheet, col + row, '');
+    rowData.push(typeof val === 'number' ? val.toFixed(2) : val);
   });
   console.log(`Row ${row}: ${rowData.join(' | ')}`);
 });
@@ -45,8 +45,8 @@ console.log('\n=== Revenue Rows (56-59) ===');
 [56, 57, 58, 59].forEach(row => {
   let rowData = [];
   cols.slice(0, 20).forEach(col => {
-    const cell = sheet[col + row];
-    rowData.push(cell ? (typeof cell.v === 'number' ? Math.round(cell.v).toLocaleString() : cell.v) : '');
+    const val = getCellValue(sheet, col + row, '');
+    rowData.push(typeof val === 'number' ? Math.round(val).toLocaleString() : val);
   });
   console.log(`Row ${row}: ${rowData.join(' | ')}`);
 });
@@ -56,8 +56,8 @@ console.log('\n=== OPEX Rows (69, 74, 80, 86, 93) ===');
 [69, 74, 80, 86, 93].forEach(row => {
   let rowData = [];
   cols.slice(0, 20).forEach(col => {
-    const cell = sheet[col + row];
-    rowData.push(cell ? (typeof cell.v === 'number' ? Math.round(cell.v).toLocaleString() : cell.v) : '');
+    const val = getCellValue(sheet, col + row, '');
+    rowData.push(typeof val === 'number' ? Math.round(val).toLocaleString() : val);
   });
   console.log(`Row ${row}: ${rowData.join(' | ')}`);
 });
@@ -68,8 +68,8 @@ console.log('\n=== Looking for month columns ===');
 for (let r = 1; r <= 10; r++) {
   let rowData = [];
   cols.slice(0, 20).forEach(col => {
-    const cell = sheet[col + r];
-    if (cell && cell.v) rowData.push(`${col}:${cell.v}`);
+    const val = getCellValue(sheet, col + r);
+    if (val !== null) rowData.push(`${col}:${val}`);
   });
   if (rowData.length > 0) console.log(`Row ${r}: ${rowData.join(' | ')}`);
 }
