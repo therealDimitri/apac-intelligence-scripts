@@ -13,6 +13,7 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { BURC_MASTER_FILE, FISCAL_YEAR, PREV_FISCAL_YEAR, requireOneDrive } from './lib/onedrive-paths.mjs'
 import { findRows, getCellValue, requireCell } from './lib/excel-utils.mjs'
+import { createSyncLogger } from './lib/sync-logger.mjs'
 
 requireOneDrive()
 
@@ -38,6 +39,8 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 async function syncBurcData() {
   console.log('📊 Syncing BURC data from Excel file...');
   console.log(`   File: ${BURC_PATH}\n`);
+
+  const syncLog = await createSyncLogger(supabase, 'burc_sync', 'cron');
 
   try {
     // Test connection
@@ -67,17 +70,21 @@ async function syncBurcData() {
     await syncPsPipeline(workbook);
     await syncRevenueStreams(workbook);
 
-    // Log sync
+    // Log sync to both legacy table and unified sync_history
     await supabase.from('burc_sync_log').insert({
       synced_at: new Date().toISOString(),
       file_path: BURC_PATH,
       status: 'success'
     });
 
+    syncLog.addProcessed(12); // 12 sync functions ran
+    await syncLog.complete({ file: BURC_PATH, fiscalYear: FISCAL_YEAR });
+
     console.log('\n✅ BURC data synced successfully!');
     console.log(`   Last sync: ${new Date().toISOString()}`);
 
   } catch (err) {
+    await syncLog.fail(err);
     console.error('❌ Error:', err.message);
     process.exit(1);
   }

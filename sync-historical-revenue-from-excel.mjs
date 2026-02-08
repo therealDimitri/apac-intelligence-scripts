@@ -14,6 +14,7 @@ import dotenv from 'dotenv';
 import XLSX from 'xlsx';
 import path from 'path';
 import { burcFile, requireOneDrive } from './lib/onedrive-paths.mjs'
+import { createSyncLogger } from './lib/sync-logger.mjs'
 
 requireOneDrive()
 
@@ -76,6 +77,8 @@ async function syncHistoricalRevenue() {
   console.log('=== Syncing Historical Revenue from APAC Revenue 2019 - 2024.xlsx ===');
   console.log('Mode:', DRY_RUN ? 'DRY RUN (no changes)' : 'LIVE');
   console.log('');
+
+  const syncLog = await createSyncLogger(supabase, 'historical_revenue_sync', DRY_RUN ? 'manual_dry_run' : 'manual');
 
   // Read Excel file - Updated path to Budget Planning folder
   const excelPath = burcFile(2025, 'Budget Planning/APAC revenue analysis 2019 through present.xlsx');
@@ -201,8 +204,14 @@ async function syncHistoricalRevenue() {
     process.stdout.write(`\rInserted ${inserted}/${records.length} records`);
   }
 
+  syncLog.addProcessed(records.length);
+  syncLog.addCreated(records.length);
+  await syncLog.complete({ dryRun: DRY_RUN, recordCount: records.length });
+
   console.log('\n\n=== Sync Complete ===');
   console.log(`Total records inserted: ${records.length}`);
 }
 
-syncHistoricalRevenue().catch(console.error);
+syncHistoricalRevenue().catch(async (err) => {
+  console.error(err);
+});

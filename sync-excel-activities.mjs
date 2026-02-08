@@ -16,11 +16,14 @@
  */
 
 import { createClient } from '@supabase/supabase-js'
+import { createHash } from 'crypto'
 import XLSX from 'xlsx'
 import path from 'path'
 import fs from 'fs'
 import { fileURLToPath } from 'url'
 import { ACTIVITY_REGISTER_2026, requireOneDrive } from './lib/onedrive-paths.mjs'
+import { createClientNameResolver } from './lib/resolve-client-names.mjs'
+import { createSyncLogger } from './lib/sync-logger.mjs'
 
 requireOneDrive()
 
@@ -67,8 +70,8 @@ const ACTIVITY_NAME_TO_EVENT_CODE = {
   'Updating Client 360': 'UPDATE_360',
 }
 
-// Sheet name to client name mapping
-const SHEET_NAME_TO_CLIENT = {
+// Legacy sheet name to client name mapping — used as fallback when DB aliases unavailable
+const SHEET_NAME_TO_CLIENT_FALLBACK = {
   'Albury-Wodonga (AWH)': 'Albury Wodonga Health',
   'GHA': 'Gippsland Health Alliance (GHA)',
   'Grampians': 'Grampians Health',
@@ -100,6 +103,12 @@ async function main() {
   console.log(`   Year: ${year}`)
   console.log(`   Mode: ${dryRun ? 'DRY RUN' : 'LIVE'}\n`)
 
+  // Initialise client name resolver from DB (falls back to hardcoded map)
+  const resolveSheetName = await createClientNameResolver(supabase, SHEET_NAME_TO_CLIENT_FALLBACK)
+
+  // Initialise sync logger
+  const syncLog = await createSyncLogger(supabase, 'activity_sync', dryRun ? 'manual_dry_run' : 'manual')
+
   // Excel file path
   const excelPath = ACTIVITY_REGISTER_2026
 
@@ -120,7 +129,7 @@ async function main() {
 
     const sheet = workbook.Sheets[sheetName]
     const data = XLSX.utils.sheet_to_json(sheet, { header: 1 })
-    const clientName = SHEET_NAME_TO_CLIENT[sheetName] || sheetName
+    const clientName = resolveSheetName(sheetName)
 
     for (let rowIdx = 4; rowIdx < data.length; rowIdx++) {
       const row = data[rowIdx]
@@ -186,21 +195,30 @@ async function main() {
     eventTypeMap.set(et.event_code, et.id)
   }
 
-  // Fetch client name aliases
-  const { data: aliases } = await supabase
-    .from('client_name_aliases')
-    .select('canonical_name, alias')
+  // Build hash set of existing events for app-level dedup
+  // This avoids unnecessary RPC calls for events already in the DB
+  const existingHashes = new Set()
+  const { data: existingEvents } = await supabase
+    .from('segmentation_events')
+    .select('client_name, event_type_id, event_date, source')
 
-  const aliasMap = new Map()
-  if (aliases) {
-    for (const alias of aliases) {
-      aliasMap.set(alias.alias.toLowerCase(), alias.canonical_name)
+  if (existingEvents) {
+    for (const ev of existingEvents) {
+      const hash = createHash('sha256')
+        .update(`${ev.client_name}|${ev.event_type_id}|${ev.event_date}`)
+        .digest('hex')
+      // Only skip if existing source is 'excel' — dashboard entries may need updating
+      if (ev.source === 'excel') {
+        existingHashes.add(hash)
+      }
     }
+    console.log(`📋 Loaded ${existingHashes.size} existing excel event hashes for dedup\n`)
   }
 
   // Process activities
   let synced = 0
   let skipped = 0
+  let dupSkipped = 0
   let errors = 0
 
   for (const activity of activities) {
@@ -211,11 +229,21 @@ async function main() {
       continue
     }
 
-    const resolvedClientName =
-      aliasMap.get(activity.clientName.toLowerCase()) || activity.clientName
+    const resolvedClientName = activity.clientName
+    const eventDate = activity.completedDate.toISOString().split('T')[0]
+
+    // App-level dedup: skip if identical event already exists from excel
+    const hash = createHash('sha256')
+      .update(`${resolvedClientName}|${eventTypeId}|${eventDate}`)
+      .digest('hex')
+
+    if (existingHashes.has(hash)) {
+      dupSkipped++
+      continue
+    }
 
     if (dryRun) {
-      console.log(`  [DRY] ${resolvedClientName} | ${activity.eventCode} | ${activity.completedDate.toISOString().split('T')[0]}`)
+      console.log(`  [DRY] ${resolvedClientName} | ${activity.eventCode} | ${eventDate}`)
       synced++
       continue
     }
@@ -223,7 +251,7 @@ async function main() {
     const { error } = await supabase.rpc('upsert_segmentation_event', {
       p_client_name: resolvedClientName,
       p_event_type_id: eventTypeId,
-      p_event_date: activity.completedDate.toISOString().split('T')[0],
+      p_event_date: eventDate,
       p_completed: true,
       p_source: 'excel',
       p_notes: `Synced from Excel: ${activity.activityName}`,
@@ -232,22 +260,30 @@ async function main() {
     if (error) {
       console.log(`  ❌ ${resolvedClientName} | ${activity.eventCode}: ${error.message}`)
       errors++
+      syncLog.addFailed()
     } else {
+      existingHashes.add(hash) // Track newly inserted events for this run
       synced++
+      syncLog.addCreated()
     }
+    syncLog.addProcessed()
   }
 
   console.log(`\n📈 Summary:`)
   console.log(`   Synced: ${synced}`)
-  console.log(`   Skipped: ${skipped}`)
+  console.log(`   Duplicates skipped: ${dupSkipped}`)
+  console.log(`   Unknown codes skipped: ${skipped}`)
   console.log(`   Errors: ${errors}`)
 
   if (dryRun) {
     console.log(`\n💡 Run without --dry-run to apply changes.`)
   }
+
+  // Log sync completion
+  await syncLog.complete({ year, dryRun, dupSkipped })
 }
 
-main().catch(err => {
+main().catch(async err => {
   console.error('Fatal error:', err)
   process.exit(1)
 })

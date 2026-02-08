@@ -3,12 +3,12 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.altera.burc-sync</string>
+    <string>com.altera.activity-sync</string>
 
     <key>ProgramArguments</key>
     <array>
         <string>/Users/jimmy.leimonitis/.nvm/versions/node/v24.11.0/bin/node</string>
-        <string>/Users/jimmy.leimonitis/GitHub/apac-intelligence-v2/scripts/sync-burc-data-supabase.mjs</string>
+        <string>/Users/jimmy.leimonitis/GitHub/apac-intelligence-v2/scripts/sync-excel-activities.mjs</string>
     </array>
 
     <key>WorkingDirectory</key>
@@ -18,10 +18,10 @@
     <integer>3600</integer>
 
     <key>StandardOutPath</key>
-    <string>/tmp/burc-sync.log</string>
+    <string>/tmp/activity-sync.log</string>
 
     <key>StandardErrorPath</key>
-    <string>/tmp/burc-sync-error.log</string>
+    <string>/tmp/activity-sync-error.log</string>
 
     <key>RunAtLoad</key>
     <true/>
