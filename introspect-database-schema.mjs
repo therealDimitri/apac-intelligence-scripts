@@ -65,6 +65,7 @@ const TABLES = [
   'goal_dependencies',
   'goal_approvals',
   'goal_audit_log',
+  'goal_status_updates',
   'custom_roles',
   'user_role_assignments',
   'role_mapping_rules',
