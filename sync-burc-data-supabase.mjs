@@ -113,7 +113,7 @@ async function syncAnnualFinancials(workbook) {
   if (apacSheet) {
     // Find rows by label — survives row insertions/deletions
     const rows = findRows(apacSheet, 'A', [
-      { key: 'grossRevenue', pattern: /^Total Gross Revenue/i },
+      { key: 'grossRevenue', pattern: /^Gross Revenue/i },
       { key: 'maintenanceArr', pattern: /^Ending ARR|^Maintenance.*ARR/i },
       { key: 'ebita', pattern: /^EBITA$/i },
     ], 'APAC BURC');
@@ -244,12 +244,12 @@ async function syncAnnualFinancials(workbook) {
 /**
  * Sync CSI Ratios from APAC BURC sheet
  * Source cells (using direct cell references):
- * - Row 122: Customer Service (>4) - maps to maintenance_ratio
- * - Row 123: Sales & Marketing (>1) - maps to sales_ratio
- * - Row 124: R&D (>1) - maps to rd_ratio
- * - Row 125: Professional Services (>2) - maps to ps_ratio
- * - Row 126: Administration <=20% - maps to ga_ratio
- * - Row 127: Core Profitability Ratio >50% - stored as core_profitability
+ * - Row 123: Customer Service (>4) - maps to maintenance_ratio
+ * - Row 124: Sales & Marketing (>1) - maps to sales_ratio
+ * - Row 125: R&D (>1) - maps to rd_ratio
+ * - Row 126: Professional Services (>2) - maps to ps_ratio
+ * - Row 127: Administration <=20% - maps to ga_ratio
+ * - Row 128: Core Profitability Ratio >50% - stored as core_profitability
  * Columns: C=Jan, D=Feb, E=Mar, F=Apr, G=May, H=Jun, I=Jul, J=Aug, K=Sep, L=Oct, M=Nov, N=Dec
  */
 async function syncCSIRatios(workbook) {
@@ -263,20 +263,20 @@ async function syncCSIRatios(workbook) {
 
   // CSI Ratio row mappings (Excel rows)
   const csiConfig = {
-    maintenance_ratio: 122, // Customer Service (>4)
-    sales_ratio: 123,       // Sales & Marketing (>1)
-    rd_ratio: 124,          // R&D (>1)
-    ps_ratio: 125,          // Professional Services (>2)
-    ga_ratio: 126,          // Administration <=20%
+    maintenance_ratio: 123, // Customer Service (>4)
+    sales_ratio: 124,       // Sales & Marketing (>1)
+    rd_ratio: 125,          // R&D (>1)
+    ps_ratio: 126,          // Professional Services (>2)
+    ga_ratio: 127,          // Administration <=20%
   };
 
   // Pre-flight: validate critical CSI rows exist
   validateCellRefs(sheet, 'APAC BURC', [
-    { ref: 'A122', label: 'Customer Service ratio label' },
-    { ref: 'A123', label: 'Sales & Marketing ratio label' },
-    { ref: 'A124', label: 'R&D ratio label' },
-    { ref: 'A125', label: 'PS ratio label' },
-    { ref: 'A126', label: 'Administration ratio label' },
+    { ref: 'A123', label: 'Customer Service ratio label' },
+    { ref: 'A124', label: 'Sales & Marketing ratio label' },
+    { ref: 'A125', label: 'R&D ratio label' },
+    { ref: 'A126', label: 'PS ratio label' },
+    { ref: 'A127', label: 'Administration ratio label' },
   ]);
 
   // Read monthly values for each CSI row
@@ -342,8 +342,8 @@ async function syncCSIRatios(workbook) {
 /**
  * Sync EBITA data from APAC BURC sheet
  * Source cells (direct cell references):
- * - Row 100: EBITA values (Actual and Forecast)
- * - Row 101: EBITA as % of Net Revenue
+ * - Row 101: EBITA values (Actual and Forecast)
+ * - Row 102: EBITA as % of Net Revenue
  * Columns: C=Jan, D=Feb, E=Mar, F=Apr, G=May, H=Jun, I=Jul, J=Aug, K=Sep, L=Oct, M=Nov, N=Dec
  * Column U = FY Forecast Total, Column W = FY Target/Budget
  */
@@ -356,13 +356,13 @@ async function syncEbitaData(workbook) {
     return;
   }
 
-  // Get annual target from cell W100 (Budget/Target)
-  const annualTarget = getCellValue(sheet, 'W100');
+  // Get annual target from cell W101 (Budget/Target)
+  const annualTarget = getCellValue(sheet, 'W101');
   const monthlyTarget = annualTarget ? annualTarget / 12 : null;
 
   // Read monthly EBITA values using readMonthlyRow
-  const ebitaValues = readMonthlyRow(sheet, 100);
-  const ebitaPctValues = readMonthlyRow(sheet, 101);
+  const ebitaValues = readMonthlyRow(sheet, 101);
+  const ebitaPctValues = readMonthlyRow(sheet, 102);
 
   // Delete existing FY data
   await supabase.from('burc_ebita_monthly').delete().eq('year', FISCAL_YEAR);
@@ -404,12 +404,12 @@ async function syncEbitaData(workbook) {
 /**
  * Sync OPEX data from APAC BURC sheet
  * Source rows:
- * - Row 71: CS (Customer Service) OPEX
- * - Row 76: R&D OPEX
- * - Row 82: PS (Professional Services) OPEX
- * - Row 88: Sales & Marketing OPEX
- * - Row 95: G&A (General & Administrative) OPEX
- * - Row 98: Total OPEX
+ * - Row 71: Professional Services (less Depr) OPEX
+ * - Row 76: Maintenance (less Depr) OPEX
+ * - Row 83: Sales & Marketing (less Depr) OPEX
+ * - Row 89: R&D (less Depr) OPEX
+ * - Row 96: G&A (less Depr) OPEX
+ * - Row 99: Total OPEX
  * Columns: C=Jan, D=Feb, E=Mar, ..., N=Dec
  */
 async function syncOpexData(workbook) {
@@ -423,12 +423,12 @@ async function syncOpexData(workbook) {
 
   // OPEX category row mappings
   const opexConfig = {
-    cs_opex: 71,        // Customer Service
-    rd_opex: 76,        // R&D
-    ps_opex: 82,        // Professional Services
-    sales_opex: 88,     // Sales & Marketing
-    ga_opex: 95,        // General & Administrative
-    total_opex: 98,     // Total OPEX
+    cs_opex: 71,        // Professional Services (less Depr) OPEX
+    rd_opex: 76,        // Maintenance (less Depr) OPEX
+    ps_opex: 83,        // Sales & Marketing (less Depr) OPEX
+    sales_opex: 89,     // R&D (less Depr) OPEX
+    ga_opex: 96,        // G&A (less Depr) OPEX
+    total_opex: 99,     // Total OPEX
   };
 
   // Read monthly values for each OPEX category
@@ -542,7 +542,7 @@ async function syncCogsData(workbook) {
  * Sync Net Revenue data from APAC BURC sheet
  * Net Revenue = Gross Revenue - COGS
  * Source rows (estimated):
- * - Row 58-66: Net Revenue by type
+ * - Rows 58-66: Net Revenue by type (License=58, PS=59, Maint=60, HW=61, Total=66)
  * Columns: C=Jan, D=Feb, E=Mar, ..., N=Dec
  */
 async function syncNetRevenueData(workbook) {
@@ -561,11 +561,11 @@ async function syncNetRevenueData(workbook) {
   }
 
   // Read monthly values for each Net Revenue category
-  const licenseRow = readMonthlyRow(sheet, 58);
-  const psRow = readMonthlyRow(sheet, 60);
-  const maintRow = readMonthlyRow(sheet, 63);
-  const hwRow = readMonthlyRow(sheet, 65);
-  const totalRow = readMonthlyRow(sheet, 66);
+  const licenseRow = readMonthlyRow(sheet, 58);    // License NR
+  const psRow = readMonthlyRow(sheet, 59);          // Professional Service NR
+  const maintRow = readMonthlyRow(sheet, 60);       // Maintenance NR (ARR)
+  const hwRow = readMonthlyRow(sheet, 61);          // Hardware & Other NR
+  const totalRow = readMonthlyRow(sheet, 66);       // Net Revenue Excluding Pipeline
 
   const records = [];
   for (let monthNum = 1; monthNum <= 12; monthNum++) {
@@ -600,11 +600,11 @@ async function syncNetRevenueData(workbook) {
 /**
  * Sync Monthly Gross Revenue from APAC BURC sheet
  * Source rows:
- * - Row 28: License Revenue
- * - Row 30: PS Revenue
- * - Row 33: Maintenance Revenue
- * - Row 35: Hardware Revenue
- * - Row 36: Total Gross Revenue
+ * - Row 10: Gross License Revenue
+ * - Row 12: Gross Professional Services Revenue
+ * - Row 18: Gross Maintenance Revenue
+ * - Row 27: Gross Hardware
+ * - Row 36: Gross Revenue Total
  * Columns: C=Jan, D=Feb, E=Mar, ..., N=Dec
  */
 async function syncGrossRevenueMonthly(workbook) {
@@ -623,11 +623,11 @@ async function syncGrossRevenueMonthly(workbook) {
   }
 
   // Read monthly values for each revenue category
-  const licenseRow = readMonthlyRow(sheet, 28);
-  const psRow = readMonthlyRow(sheet, 30);
-  const maintRow = readMonthlyRow(sheet, 33);
-  const hwRow = readMonthlyRow(sheet, 35);
-  const totalRow = readMonthlyRow(sheet, 36);
+  const licenseRow = readMonthlyRow(sheet, 10);    // Gross License Revenue
+  const psRow = readMonthlyRow(sheet, 12);          // Gross Professional Services Revenue
+  const maintRow = readMonthlyRow(sheet, 18);       // Gross Maintenance Revenue
+  const hwRow = readMonthlyRow(sheet, 27);          // Gross Hardware
+  const totalRow = readMonthlyRow(sheet, 36);       // Gross Revenue Total
 
   const records = [];
   for (let monthNum = 1; monthNum <= 12; monthNum++) {
@@ -662,11 +662,11 @@ async function syncGrossRevenueMonthly(workbook) {
 /**
  * Sync Quarterly Comparison from APAC BURC sheet for current FY data
  * Source rows (using direct cell references):
- * - Row 28: License Revenue
- * - Row 30: PS Revenue
- * - Row 33: Maintenance Revenue
- * - Row 35: Hardware Revenue
- * - Row 36: Total Gross Revenue
+ * - Row 10: Gross License Revenue
+ * - Row 12: Gross Professional Services Revenue
+ * - Row 18: Gross Maintenance Revenue
+ * - Row 27: Gross Hardware
+ * - Row 36: Gross Revenue Total
  * Columns: C-E=Q1, F-H=Q2, I-K=Q3, L-N=Q4
  */
 async function syncQuarterlyComparison(workbook) {
@@ -680,10 +680,10 @@ async function syncQuarterlyComparison(workbook) {
 
   // Revenue stream row mappings
   const streamMappings = [
-    { row: 28, stream: 'license' },
-    { row: 30, stream: 'professional_services' },
-    { row: 33, stream: 'maintenance' },
-    { row: 35, stream: 'hardware' },
+    { row: 10, stream: 'license' },
+    { row: 12, stream: 'professional_services' },
+    { row: 18, stream: 'maintenance' },
+    { row: 27, stream: 'hardware' },
     { row: 36, stream: 'gross_revenue' },
   ];
 
@@ -929,11 +929,11 @@ async function syncPsPipeline(workbook) {
 /**
  * Sync Revenue Streams from APAC BURC sheet
  * Source rows (using direct cell references):
- * - Row 28: License Revenue
- * - Row 30: PS Revenue
- * - Row 33: Maintenance Revenue
- * - Row 35: Hardware Revenue
- * - Row 36: Total Gross Revenue
+ * - Row 10: Gross License Revenue
+ * - Row 12: Gross Professional Services Revenue
+ * - Row 18: Gross Maintenance Revenue
+ * - Row 27: Gross Hardware
+ * - Row 36: Gross Revenue Total
  * Columns: C-E=Q1, F-H=Q2, I-K=Q3, L-N=Q4, U=FY${FISCAL_YEAR} Forecast
  */
 async function syncRevenueStreams(workbook) {
@@ -947,10 +947,10 @@ async function syncRevenueStreams(workbook) {
 
   // Revenue stream row mappings
   const streamMappings = [
-    { row: 28, stream: 'License' },
-    { row: 30, stream: 'Professional Services' },
-    { row: 33, stream: 'Maintenance' },
-    { row: 35, stream: 'Hardware' },
+    { row: 10, stream: 'License' },
+    { row: 12, stream: 'Professional Services' },
+    { row: 18, stream: 'Maintenance' },
+    { row: 27, stream: 'Hardware' },
     { row: 36, stream: 'Gross Revenue' },
     { row: 38, stream: 'License COGS' },
   ];
