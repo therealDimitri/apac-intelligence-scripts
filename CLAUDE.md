@@ -97,6 +97,8 @@ All scripts use `.mjs` extension and ES modules syntax:
 ## Gotchas
 
 - Scripts assume they're in a `scripts/` subdirectory of the main app
+- `sync-burc-data-supabase.mjs` has hardcoded Excel row numbers that break when Finance restructures the APAC BURC sheet. Row map in `../docs/knowledge-base/02-data-pipeline/burc-sync.md`. To debug: dump column A labels with `xlsx.readFile()` and compare against script comments
+- `launchd/com.altera.burc-sync.plist` is the source of truth — must be manually copied to `~/Library/LaunchAgents/` when changed
 - Service role key required (anon key won't work due to RLS)
 - Some scripts have hardcoded table lists that may need updating
 - No `package.json` here — dependencies come from parent `node_modules/`
