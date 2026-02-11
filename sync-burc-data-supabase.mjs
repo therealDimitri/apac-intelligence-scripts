@@ -441,7 +441,7 @@ async function syncOpexData(workbook) {
 
   // Delete existing FY OPEX data
   const { error: delError } = await supabase.from('burc_opex_monthly').delete().eq('year', FISCAL_YEAR);
-  if (delError && !delError.message.includes('does not exist')) {
+  if (delError && !delError.message.includes('does not exist') && !delError.message.includes('Could not find the table')) {
     console.log('   ⚠️ Delete error:', delError.message);
   }
 
@@ -464,7 +464,7 @@ async function syncOpexData(workbook) {
   // Insert new records (check if table exists first)
   const { error: insertError } = await supabase.from('burc_opex_monthly').insert(records);
   if (insertError) {
-    if (insertError.message.includes('does not exist')) {
+    if (insertError.message.includes('does not exist') || insertError.message.includes('Could not find the table')) {
       console.log('   ℹ️ Table burc_opex_monthly does not exist - skipping');
     } else {
       console.error('   ❌ OPEX insert error:', insertError.message);
@@ -497,7 +497,7 @@ async function syncCogsData(workbook) {
 
   // Delete existing FY COGS data
   const { error: delError } = await supabase.from('burc_cogs_monthly').delete().eq('year', FISCAL_YEAR);
-  if (delError && !delError.message.includes('does not exist')) {
+  if (delError && !delError.message.includes('does not exist') && !delError.message.includes('Could not find the table')) {
     console.log('   ⚠️ Delete error:', delError.message);
   }
 
@@ -526,7 +526,7 @@ async function syncCogsData(workbook) {
   // Insert new records
   const { error: insertError } = await supabase.from('burc_cogs_monthly').insert(records);
   if (insertError) {
-    if (insertError.message.includes('does not exist')) {
+    if (insertError.message.includes('does not exist') || insertError.message.includes('Could not find the table')) {
       console.log('   ℹ️ Table burc_cogs_monthly does not exist - skipping');
     } else {
       console.error('   ❌ COGS insert error:', insertError.message);
@@ -556,7 +556,7 @@ async function syncNetRevenueData(workbook) {
 
   // Delete existing FY Net Revenue data
   const { error: delError } = await supabase.from('burc_net_revenue_monthly').delete().eq('year', FISCAL_YEAR);
-  if (delError && !delError.message.includes('does not exist')) {
+  if (delError && !delError.message.includes('does not exist') && !delError.message.includes('Could not find the table')) {
     console.log('   ⚠️ Delete error:', delError.message);
   }
 
@@ -585,7 +585,7 @@ async function syncNetRevenueData(workbook) {
   // Insert new records
   const { error: insertError } = await supabase.from('burc_net_revenue_monthly').insert(records);
   if (insertError) {
-    if (insertError.message.includes('does not exist')) {
+    if (insertError.message.includes('does not exist') || insertError.message.includes('Could not find the table')) {
       console.log('   ℹ️ Table burc_net_revenue_monthly does not exist - skipping');
     } else {
       console.error('   ❌ Net Revenue insert error:', insertError.message);
@@ -618,7 +618,7 @@ async function syncGrossRevenueMonthly(workbook) {
 
   // Delete existing FY monthly revenue data
   const { error: delError } = await supabase.from('burc_gross_revenue_monthly').delete().eq('year', FISCAL_YEAR);
-  if (delError && !delError.message.includes('does not exist')) {
+  if (delError && !delError.message.includes('does not exist') && !delError.message.includes('Could not find the table')) {
     console.log('   ⚠️ Delete error:', delError.message);
   }
 
@@ -647,7 +647,7 @@ async function syncGrossRevenueMonthly(workbook) {
   // Insert new records
   const { error: insertError } = await supabase.from('burc_gross_revenue_monthly').insert(records);
   if (insertError) {
-    if (insertError.message.includes('does not exist')) {
+    if (insertError.message.includes('does not exist') || insertError.message.includes('Could not find the table')) {
       console.log('   ℹ️ Table burc_gross_revenue_monthly does not exist - skipping');
     } else {
       console.error('   ❌ Gross Revenue insert error:', insertError.message);

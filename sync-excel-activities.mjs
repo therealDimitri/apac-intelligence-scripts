@@ -107,7 +107,7 @@ async function main() {
   const resolveSheetName = await createClientNameResolver(supabase, SHEET_NAME_TO_CLIENT_FALLBACK)
 
   // Initialise sync logger
-  const syncLog = await createSyncLogger(supabase, 'activity_sync', dryRun ? 'manual_dry_run' : 'manual')
+  const syncLog = await createSyncLogger(supabase, 'activity_sync', dryRun ? 'manual' : 'cron')
 
   // Excel file path
   const excelPath = ACTIVITY_REGISTER_CURRENT
@@ -182,6 +182,7 @@ async function main() {
 
   if (activities.length === 0) {
     console.log('No activities to sync.')
+    await syncLog.complete({ year, noActivities: true })
     return
   }
 
