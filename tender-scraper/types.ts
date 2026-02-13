@@ -38,7 +38,7 @@ export const PORTAL_CONFIGS: Record<string, ScraperConfig> = {
     enabled: true,
     baseUrl: 'https://www.tenders.gov.au',
     searchKeywords: ['health', 'hospital', 'medical', 'clinical', 'healthcare'],
-    maxPages: 50, // 12 months of data needs more pages
+    maxPages: 10, // Current ATM list is typically 2-5 pages
     timeout: 30000,
   },
   victoria: {
@@ -64,5 +64,13 @@ export const PORTAL_CONFIGS: Record<string, ScraperConfig> = {
     searchKeywords: ['health'],
     maxPages: 3,
     timeout: 45000, // Blazor needs more time
+  },
+  'nz-gets': {
+    name: 'NZ GETS',
+    enabled: true,
+    baseUrl: 'https://www.gets.govt.nz',
+    searchKeywords: ['health', 'hospital', 'medical', 'clinical', 'digital health'],
+    maxPages: 5,
+    timeout: 30000,
   },
 }

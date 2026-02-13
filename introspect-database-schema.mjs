@@ -70,6 +70,30 @@ const TABLES = [
   'user_role_assignments',
   'role_mapping_rules',
   'ms_graph_sync_log',
+  // News & Tender intelligence
+  'news_sources',
+  'news_articles',
+  'tender_opportunities',
+  // Support & SLA
+  'support_case_details',
+  'support_sla_metrics',
+  // Sync tracking
+  'sync_history',
+  // Segmentation
+  'segmentation_events',
+  'segmentation_event_types',
+  'client_name_aliases',
+  // BURC financial tables
+  'burc_monthly_metrics',
+  'burc_executive_summary',
+  'burc_annual_financials',
+  'burc_revenue_detail',
+  'burc_ebita_monthly',
+  // Account planning
+  'account_plans',
+  'account_plan_steps',
+  // Compliance
+  'compliance_matrix',
 ]
 
 async function introspectSchema() {

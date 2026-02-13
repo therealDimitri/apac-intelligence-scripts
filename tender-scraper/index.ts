@@ -14,6 +14,7 @@ import { AusTenderScraper } from './scrapers/austender'
 import { VictoriaScraper } from './scrapers/victoria'
 import { NSWScraper } from './scrapers/nsw'
 import { QLDScraper } from './scrapers/qld'
+import { NZGetsScraper } from './scrapers/nz-gets'
 import { storeTenders, updateScraperLog } from './utils/supabase'
 import type { ScraperResult, TenderResult } from './types'
 import { PORTAL_CONFIGS } from './types'
@@ -24,6 +25,7 @@ const SCRAPERS = {
   victoria: VictoriaScraper,
   nsw: NSWScraper,
   qld: QLDScraper,
+  'nz-gets': NZGetsScraper,
 }
 
 async function runScraper(

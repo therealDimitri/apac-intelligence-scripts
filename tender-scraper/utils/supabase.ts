@@ -49,8 +49,6 @@ export async function storeTenders(tenders: TenderResult[]): Promise<number> {
   }
 
   // Insert new tenders
-  // Note: source_url is stored in TenderResult but not in the DB schema
-  // We store it in the notes field as a workaround
   const toInsert = newTenders.map(t => ({
     tender_reference: t.tender_reference,
     issuing_body: t.issuing_body,
@@ -59,8 +57,8 @@ export async function storeTenders(tenders: TenderResult[]): Promise<number> {
     region: t.region,
     close_date: t.close_date,
     estimated_value: t.estimated_value,
+    source_url: t.source_url || null,
     status: 'open',
-    notes: t.source_url ? `Source: ${t.source_url}` : null,
   }))
 
   const { error } = await supabase.from('tender_opportunities').insert(toInsert)
@@ -88,6 +86,7 @@ export async function updateScraperLog(
     victoria: 'Victoria Government Tenders',
     nsw: 'NSW eTendering',
     qld: 'QLD QTenders',
+    'nz-gets': 'GETS - NZ Government Tenders',
   }
 
   const sourceName = portalNameMap[portal]
